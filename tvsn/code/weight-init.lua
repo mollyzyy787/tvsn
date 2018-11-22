@@ -34,7 +34,11 @@ function w_init_kaiming(fan_in, fan_out)
    return math.sqrt(4/(fan_in + fan_out))
 end
 
-
+-- Molly:
+-- Input g is nngraph, to initialize:
+-- g = nn.gModule({input}, {output})  see TVSN_256.lua, line 96 (initialize graph for netG) and 125 (initialize graph for netD)
+-- Usage: g:forward(indata); g:backward(indata, gdata)
+-- see: https://github.com/torch/nngraph
 function w_init.nngraph(g, arg)
    -- choose initialization method
    local method = nil
@@ -45,7 +49,7 @@ function w_init.nngraph(g, arg)
    else
       assert(false)
    end
-	 
+
 	 for i,node in ipairs(g.forwardnodes) do
 		 if node.data.module then
 			 -- loop over all convolutional modules
@@ -72,7 +76,7 @@ function w_init.nngraph(g, arg)
 			 elseif m.__typename == 'nn.Linear' then
 				 m:reset(method(m.weight:size(2), m.weight:size(1)))
 			 elseif m.__typename == 'nn.TemporalConvolution' then
-				 m:reset(method(m.weight:size(2), m.weight:size(1)))            
+				 m:reset(method(m.weight:size(2), m.weight:size(1)))
 			 end
 
 			 if m.bias then
@@ -82,6 +86,11 @@ function w_init.nngraph(g, arg)
 	 end
 end
 
+-- Molly:
+-- Input is neural nets (contains multiple modules) instead of graph
+-- Modules are the bricks used to build neural networks.
+-- Each are themselves neural networks, but can be combined with other networks using containers to create complex neural networks
+-- see https://github.com/torch/nn
 function w_init.nn(net, arg)
    -- choose initialization method
    local method = nil
@@ -118,7 +127,7 @@ function w_init.nn(net, arg)
       elseif m.__typename == 'nn.Linear' then
          m:reset(method(m.weight:size(2), m.weight:size(1)))
       elseif m.__typename == 'nn.TemporalConvolution' then
-         m:reset(method(m.weight:size(2), m.weight:size(1)))            
+         m:reset(method(m.weight:size(2), m.weight:size(1)))
       end
 
       if m.bias then
@@ -127,6 +136,9 @@ function w_init.nn(net, arg)
    end
 end
 
+-- Molly:
+-- Input is a single module
+-- see https://github.com/torch/nn/blob/master/doc/module.md#nn.Module
 function w_init.module(m, arg)
    -- choose initialization method
    local method = nil
@@ -155,7 +167,7 @@ function w_init.module(m, arg)
 	 elseif m.__typename == 'nn.Linear' then
 		 m:reset(method(m.weight:size(2), m.weight:size(1)))
 	 elseif m.__typename == 'nn.TemporalConvolution' then
-		 m:reset(method(m.weight:size(2), m.weight:size(1)))            
+		 m:reset(method(m.weight:size(2), m.weight:size(1)))
 	 end
 	 if m.bias then
 		 m.bias:zero()
