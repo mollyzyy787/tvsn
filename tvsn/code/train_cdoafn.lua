@@ -89,6 +89,7 @@ if opt.resume > 0 then
 			net = loader.net
 			loss_list_im = loader.loss_list_im
 			loss_list_map = loader.loss_list_map
+			loss_list_map2 = loader.loss_list_map2
 			print(opt.modelPath .. string.format('/net-epoch-%d.t7', i))
 			print(string.format('resuming from epoch %d', i))
 			break
@@ -102,13 +103,16 @@ else
 	w_init.nngraph(net, 'kaiming')
 	loss_list_im = torch.Tensor(1,1):fill(100)
 	loss_list_map = torch.Tensor(1,1):fill(100)
+	loss_list_map2 = torch.Tensor(1,1):fill(100)
 end
 local criterion_im = nn.AbsCriterion()
 local criterion_map = nn.BCECriterion()
+local criterion_map2 = nn.BCECriterion()
 if opt.gpu >= 0 then
   net = net:cuda()
 	criterion_im = criterion_im:cuda()
 	criterion_map = criterion_map:cuda()
+	criterion_map2 = criterion_map2:cuda()
 end
 local parameters, gradParameters = net:getParameters()
 
@@ -119,11 +123,17 @@ local opfunc = function(x)
 	gradParameters:zero()
 
 	f = net:forward({batch_im_in, batch_view_in})
+
 	im_err = criterion_im:forward(f[1], batch_im_out)
 	local df_d_im = criterion_im:backward(f[1], batch_im_out)
+
 	map_err = criterion_map:forward(f[2], batch_map)
 	local df_d_map = criterion_map:backward(f[2], batch_map)
-	net:backward({batch_im_in, batch_view_in}, {df_d_im:mul(2),df_d_map})
+
+	map2_err = criterion_map2:forward(f[3], batch_map2)
+	local df_d_map2 = criterion_map2:backward(f[3], batch_map3)
+
+	net:backward({batch_im_in, batch_view_in}, {df_d_im:mul(2),df_d_map,df_d_map2})
 
 	return 0, gradParameters
 end
@@ -140,8 +150,10 @@ for t = epoch+1, opt.maxEpoch do
 		data_tm:reset(); data_tm:resume()
 		batch_im_in, batch_im_out, batch_map, batch_view_in = data:getBatch()
 		-- make it [0, 1] -> [-1, 1]
+		batch_map2 = torch.ceil(batch_im_in) -- calculate contour from batch_im_in
 		batch_im_in:mul(2):add(-1)
     	batch_im_out:mul(2):add(-1)
+
 		if opt.gpu >= 0 then
 			batch_im_in = batch_im_in:cuda()
 			batch_im_out = batch_im_out:cuda()
