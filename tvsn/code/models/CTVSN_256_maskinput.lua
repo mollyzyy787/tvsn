@@ -19,7 +19,7 @@ function DCGAN.create_netG(opts)
 	table.insert(inputs,input_im_feat)
 	table.insert(inputs,input_view)
 	table.insert(inputs,mean)
-	table.insert(inputs,output_mask)  --size of mask is 3 x imscale x imscale
+	table.insert(inputs,output_mask)  --size of mask is 3 x imscale(256) x imscale
 
   -- 3 x 256 x 256
 	local en_conv1 = nn.LeakyReLU(0.2, true)(cudnn.SpatialBatchNormalization(16)(cudnn.SpatialConvolution(3,16,4,4,2,2,1,1)(input_im)))
@@ -40,11 +40,28 @@ function DCGAN.create_netG(opts)
 	local view_fc2 = nn.Reshape(opts.batchSize, 128, 1, 1)(cudnn.ReLU()(nn.Linear(128,128)(view_fc1)))
 	local view_conv = cudnn.SpatialFullConvolution(128,128,4,4)(view_fc2)
 	local view_conv = cudnn.ReLU()(cudnn.SpatialBatchNormalization(128)(view_conv))
-	local concat1 = nn.JoinTable(2)({en_conv6,input_im_feat,view_conv})
+
+  -- output mask
+	-- 3 x 256 x 256
+	local en_conv1_mask = nn.LeakyReLU(0.2, true)(cudnn.SpatialBatchNormalization(16)(cudnn.SpatialConvolution(3,16,4,4,2,2,1,1)(output_mask)))
+  -- 16 x 128 x 128
+	local en_conv2_mask = nn.LeakyReLU(0.2, true)(cudnn.SpatialBatchNormalization(32)(cudnn.SpatialConvolution(16,32,4,4,2,2,1,1)(en_conv1_mask)))
+  -- 32 x 64 x 64
+	local en_conv3_mask = nn.LeakyReLU(0.2, true)(cudnn.SpatialBatchNormalization(64)((cudnn.SpatialConvolution(32,64,4,4,2,2,1,1)(en_conv2_mask))))
+  -- 64 x 32 x 32
+	local en_conv4_mask = nn.LeakyReLU(0.2, true)(cudnn.SpatialBatchNormalization(128)((cudnn.SpatialConvolution(64,128,4,4,2,2,1,1)(en_conv3_mask))))
+  -- 128 x 16 x 16
+	local en_conv5_mask = nn.LeakyReLU(0.2, true)(cudnn.SpatialBatchNormalization(256)((cudnn.SpatialConvolution(128,256,4,4,2,2,1,1)(en_conv4_mask))))
+  -- 256 x 8 x 8
+	local en_conv6_mask = nn.LeakyReLU(0.2, true)(cudnn.SpatialBatchNormalization(512)((cudnn.SpatialConvolution(256,512,4,4,2,2,1,1)(en_conv5_mask))))
+  --512 x 4 x 4
+
+	--en_conv6 is 512 x 4 x 4, input_im_feat = 512 x 4 x 4, view_conv = 128 x 4 x 4, en_conv6 is 512 x 4 x 4
+	local concat1 = nn.JoinTable(2)({en_conv6,input_im_feat,view_conv, en_conv6_mask})
 
 	-- code
 	-- (512+128) x 4 x 4
-	local concat2 = cudnn.SpatialFullConvolution(512+512+128,512,3,3,1,1,1,1)(concat1)
+	local concat2 = cudnn.SpatialFullConvolution(512+512+128+512,512,3,3,1,1,1,1)(concat1)
 	local concat2 = cudnn.ReLU()(cudnn.SpatialBatchNormalization(512)(concat2))
 	-- (512+128) x 4 x 4
 	local concat3 = cudnn.SpatialFullConvolution(512,512,3,3,1,1,1,1)(concat2)
