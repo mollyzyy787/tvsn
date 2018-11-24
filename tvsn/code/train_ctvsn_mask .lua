@@ -2,7 +2,7 @@ require 'torch'
 require 'cutorch'
 require 'nn'
 require 'cunn'
--- require 'cudnn'
+require 'cudnn'
 require 'optim'
 require 'image'
 require 'paths'
@@ -20,14 +20,14 @@ opt = lapp[[
   --background				(default 0)
   --nThreads					(default 8)
   --maxEpoch          (default 200)
-  --iter_per_epoch		(default 10)
+  --iter_per_epoch		(default 1000)
   --batchSize         (default 15)
   --lossnet						(default 'vgg16')
   --lr								(default 0.0001)
   --beta1							(default 0.5)
   --lambda1						(default 100)
   --lambda2						(default 0.001)
-  --lambda3           (default 0.0001)
+  --contour_weight           (default 0.0)
 	--iterG							(default 2)
   --loss_layer				(default 3)
 	--tv_weight					(default 0.0001)
@@ -39,7 +39,9 @@ opt = lapp[[
 	-d, --debug					(default 0)
 ]]
 
---lambda3 is a the coefficient for contour loss
+--beta1 is the hyperparameter for GD with momentum, used in adam optimization
+--lambda1 is the coefficient for netD feature level loss
+--lambda2 is the coefficient for vgg feature level loss
 
 print(opt)
 if opt.debug > 0 then
@@ -56,7 +58,7 @@ torch.setdefaulttensortype('torch.FloatTensor')
 
 opt.modelName = string.format('%s_%s_%s_bs%03d', opt.modelString, opt.imgscale, opt.category, opt.batchSize)
 -- opt.doafnName = string.format('CDOAFN_SYM_%s_%s_bs025',opt.imgscale, opt.category)
-opt.doafnName = string.format('CDOAFN2_SYM_%s_%s_bs002',opt.imgscale, opt.category) --Xiaobai
+opt.doafnName = string.format('CDOAFN_SYM_%s_%s_bs025',opt.imgscale, opt.category) --Xiaobai
 opt.modelPath = opt.modelDir .. opt.modelName
 if not paths.dirp(opt.modelPath) then
   paths.mkdir(opt.modelPath)
@@ -117,10 +119,7 @@ function TVLoss:updateGradInput(input, gradOutput)
 end
 
 print('loading lossnet for perceptual loss...')
--- lossnet = torch.load(string.format('lossnet/%s_l%d.t7',opt.lossnet,opt.loss_layer))
-lossnet_module = dofile('lossnet/vgg16_l3_2.lua')
-lossnet = lossnet_module.create()
-lossnet:apply(weights_init) --Xiaobai, create own loss net
+lossnet = torch.load(string.format('lossnet/%s_l%d.t7',opt.lossnet,opt.loss_layer))
 if opt.tv_weight > 0 then
 	tvloss = nn.TVLoss(opt.tv_weight):float()
 end
@@ -135,7 +134,7 @@ print("Dataset: " .. opt.dataset .. " nTotal: " .. ntrain+ntest .. " nTrain: " .
 
 print('loading pretrained doafn ...')
 -- local doafn_loader = torch.load(opt.modelDir .. opt.doafnName .. '/net-epoch-200.t7')
-local doafn_loader = torch.load(opt.modelDir .. opt.doafnName .. '/net-epoch-2.t7') --Xiaobai
+local doafn_loader = torch.load(opt.modelDir .. opt.doafnName .. '/net-epoch-200.t7') --Xiaobai
 local doafn = doafn_loader.net
 
 -- load model from current learning stage
@@ -175,14 +174,14 @@ local criterionGAN = nn.BCECriterion()  --binary cross entropy
 
 local optimStateD = { learningRate = opt.lr, beta1 = opt.beta1 }
 local optimStateG = { learningRate = opt.lr, beta1 = opt.beta1 }
-local plot_err_gap = 10 --Xiaobai
+local plot_err_gap = 100 --Xiaobai
 
 local feat_err, feat_err_per, pixel_err
 local real_label = 1
 local fake_label = 0
 local batch_doafn_out_masked = torch.Tensor(opt.batchSize, 3, opt.imgscale, opt.imgscale)
 local batch_doafn_feat = torch.Tensor(opt.batchSize, 512, 4, 4)
-local batch_cdoafn_mask = torch.Tensor(opt.batchSize, 3, opt.imgscale, opt.imgscale)
+local batch_cdoafn_mask = torch.Tensor(opt.batchSize, 1, opt.imgscale, opt.imgscale)
 local batch_im_fake = torch.Tensor(opt.batchSize, 3, opt.imgscale, opt.imgscale)
 local label = torch.Tensor(opt.batchSize)
 local batch_im_out_per = torch.Tensor(opt.batchSize, 3, opt.imgscale, opt.imgscale)
@@ -327,7 +326,7 @@ local fGx = function(x)
 		 local d_tvloss = tvloss:updateGradInput(batch_im_fake,0)
 		 --print(torch.abs(df_do2):mean(), torch.abs(df_do2):max(), torch.abs(df_do2):min())
 		 --print(torch.abs(d_tvloss):mean(),torch.abs(d_tvloss):max(), torch.abs(d_tvloss):min() )
-		 df_do2:add(d_tvloss:mul(tv_weight))
+		 df_do2:add(d_tvloss)
 	 end
 
 ----------------------------------------------------------------------
@@ -338,7 +337,7 @@ local fGx = function(x)
    fake_contour:add(-1):mul(-1)
    err_contour = criterion_l1:forward(batch_cdoafn_mask, fake_contour)
    local d_contour = criterion_l1:backward(batch_cdoafn_mask, fake_contour)
-   d_contour:mul(opt.lambda3)
+   d_contour:mul(opt.contour_weight)
 -------------------------------------------------------------------
 
 	 -- compute error in pixel level
@@ -386,7 +385,7 @@ local get_batch = function()
 
 	batch_doafn_feat:copy(doafn.forwardnodes[doafn_feat_idx].data.module.output)
 
-	batch_cdoafn_mask:copy(f[3]:repeatTensor(1,3,1,1))
+	batch_cdoafn_mask:copy(f[3])
 	-- print("!!!",batch_cdoafn_mask:size())
 end
 
@@ -420,7 +419,7 @@ for t = epoch+1, opt.maxEpoch do
 		loss_listG = torch.cat(loss_listG, torch.Tensor(1,1):fill(errG[1]),1)
 
 		-- plot
-		if iter % 10 == 0 then --Xiaobai
+		if iter % 250 == 0 then --Xiaobai
 			local nrow = 5
 			local to_plot={}
 			local pred = netG.forwardnodes[tanh_out_idx].data.module.output:clone()
@@ -434,7 +433,7 @@ for t = epoch+1, opt.maxEpoch do
 				to_plot[(k-1)*nrow + 3]:add(1):mul(0.5)
 				to_plot[(k-1)*nrow + 4] = batch_im_out[k]:clone() --target
 				to_plot[(k-1)*nrow + 4]:add(1):mul(0.5)
-				to_plot[(k-1)*nrow + 5] = batch_cdoafn_mask[k]:clone() --predict counter
+				to_plot[(k-1)*nrow + 5] = batch_cdoafn_mask[k]:repeatTensor(3,1,1):clone() --predict counter
 			end
 			formatted = image.toDisplayTensor({input=to_plot, nrow = nrow})
 			image.save((opt.modelPath .. '/training/' ..

@@ -1,0 +1,4 @@
+#!/bin/bash
+OMP_NUM_THREADS=2 CUDA_VISIBLE_DEVICES=0 th train_ctvsn2_maskc.lua --category car --modelString CTVSN2_maskc --lambda1 100 --lambda2 0.001 --background 0 --iterG 2 --tv_weight 0.0001 --pixel_weight 0 --lr 0.0001 --beta1 0.5 --imgscale 256 --batchSize 2 --saveFreq 1 --maxEpoch 2 --gpu -1 --nThreads 0 --resume 0
+# OMP_NUM_THREADS=2 CUDA_VISIBLE_DEVICES=0 th train_ctvsn.lua --category car --modelString CTVSN --lambda1 100 --lambda2 0.001 --background 0 --iterG 2 --tv_weight 0.0001 --pixel_weight 0 --lr 0.00001 --beta1 0.5 --imgscale 256 --batchSize 5 --saveFreq 20 --maxEpoch 200 --gpu 0 --nThreads 0 --resume 1
+# OMP_NUM_THREADS=2 CUDA_VISIBLE_DEVICES=0 th train_ctvsn.lua --category car --modelString CTVSN --lambda1 100 --lambda2 0.001 --background 0 --iterG 2 --tv_weight 0.0001 --pixel_weight 10 --lr 0.00001 --beta1 0.5 --imgscale 256 --batchSize 5 --saveFreq 10 --maxEpoch 220 --gpu 0 --nThreads 0 --resume 1
