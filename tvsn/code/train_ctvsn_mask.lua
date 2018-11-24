@@ -27,6 +27,7 @@ opt = lapp[[
   --beta1							(default 0.5)
   --lambda1						(default 100)
   --lambda2						(default 0.001)
+  --lambda3           (default 0.0001)
 	--iterG							(default 2)
   --loss_layer				(default 3)
 	--tv_weight					(default 0.0001)
@@ -37,6 +38,8 @@ opt = lapp[[
 	--resume						(default 0)
 	-d, --debug					(default 0)
 ]]
+
+--lambda3 is a the coefficient for contour loss
 
 print(opt)
 if opt.debug > 0 then
@@ -166,9 +169,9 @@ else
 end
 local criterion_l1 = nn.AbsCriterion()
 criterion_l1.sizeAverage = true
-local criterion_pixel = nn.MSECriterion()
+local criterion_pixel = nn.MSECriterion()  -- mean square error
 criterion_pixel.sizeAverage = true
-local criterionGAN = nn.BCECriterion()
+local criterionGAN = nn.BCECriterion()  --binary cross entropy
 
 local optimStateD = { learningRate = opt.lr, beta1 = opt.beta1 }
 local optimStateG = { learningRate = opt.lr, beta1 = opt.beta1 }
@@ -318,13 +321,25 @@ local fGx = function(x)
 		 table.insert(d_feat_per,derr:clone())
 	 end
 	 local df_do2 = lossnet:updateGradInput(batch_im_fake,d_feat_per)
+   df_do2:mul(opt.lambda2)
+
 	 if opt.tv_weight > 0 then
 		 local d_tvloss = tvloss:updateGradInput(batch_im_fake,0)
 		 --print(torch.abs(df_do2):mean(), torch.abs(df_do2):max(), torch.abs(df_do2):min())
 		 --print(torch.abs(d_tvloss):mean(),torch.abs(d_tvloss):max(), torch.abs(d_tvloss):min() )
-		 df_do2:add(d_tvloss)
+		 df_do2:add(d_tvloss:mul(tv_weight))
 	 end
-	 df_do2:mul(opt.lambda2)
+
+----------------------------------------------------------------------
+   -- Molly:
+   -- comput contour loss
+   local fake_contour = torch.sum(batch_im_fake,2)
+   fake_contour = torch.floor(fake_contour:mul(1/3))
+   fake_contour:add(-1):mul(-1)
+   err_contour = criterion_l1:forward(batch_cdoafn_mask, fake_contour)
+   local d_contour = criterion_l1:backward(batch_cdoafn_mask, fake_contour)
+   d_contour:mul(opt.lambda3)
+-------------------------------------------------------------------
 
 	 -- compute error in pixel level
 	 --local d_pxloss
@@ -339,7 +354,7 @@ local fGx = function(x)
 	 --print(torch.abs(df_do1):mean(),torch.abs(df_do1):max(), torch.abs(df_do1):min() )
 	 --print(torch.abs(df_do2):mean(),torch.abs(df_do2):max(), torch.abs(df_do2):min() )
 
-	 netG:backward( {batch_doafn_out_masked, batch_doafn_feat, batch_view_in, mean_pixel, batch_cdoafn_mask}, df_do1:add(df_do2):add(d_pxloss) )
+	 netG:backward( {batch_doafn_out_masked, batch_doafn_feat, batch_view_in, mean_pixel, batch_cdoafn_mask}, df_do1:add(df_do2):add(d_pxloss):add(d_contour) )
 
    return errG, gradParametersG
 end
