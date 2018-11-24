@@ -38,6 +38,10 @@ opt = lapp[[
 	-d, --debug					(default 0)
 ]]
 
+--beta1 is the hyperparameter for GD with momentum, used in adam optimization
+--lambda1 is the coefficient for netD feature level loss
+--lambda2 is the coefficient for vgg feature level loss
+
 print(opt)
 if opt.debug > 0 then
 	debugger = require('fb.debugger')
@@ -81,7 +85,7 @@ local function weights_init(m)
    end
 end
 
--- This code is copied from https://github.com/jcjohnson/fast-neural-style  
+-- This code is copied from https://github.com/jcjohnson/fast-neural-style
 local TVLoss, parent = torch.class('nn.TVLoss', 'nn.Module')
 function TVLoss:__init(strength)
   parent.__init(self)
@@ -176,6 +180,7 @@ local real_label = 1
 local fake_label = 0
 local batch_doafn_out_masked = torch.Tensor(opt.batchSize, 3, opt.imgscale, opt.imgscale)
 local batch_doafn_feat = torch.Tensor(opt.batchSize, 512, 4, 4)
+local batch_cdoafn_mask = torch.Tensor(opt.batchSize, 3, opt.imgscale, opt.imgscale)
 local batch_im_fake = torch.Tensor(opt.batchSize, 3, opt.imgscale, opt.imgscale)
 local label = torch.Tensor(opt.batchSize)
 local batch_im_out_per = torch.Tensor(opt.batchSize, 3, opt.imgscale, opt.imgscale)
@@ -205,6 +210,7 @@ if opt.gpu >= 0 then
 	end
 	batch_doafn_out_masked = batch_doafn_out_masked:cuda()
 	batch_doafn_feat = batch_doafn_feat:cuda()
+  batch_cdoafn_mask = batch_cdoafn_mask:cuda()
 	batch_im_fake = batch_im_fake:cuda()
 	batch_im_out_per = batch_im_out_per:cuda()
 	lossnet = lossnet:cuda()
@@ -231,24 +237,25 @@ local fDx = function(x)
 		 table.insert(df_do,out[l]:clone():fill(0))
 	 end
 	 local output_label = out[opt.loss_layer+1]
-   local errD_real = criterionGAN:forward(output_label, label)
+   local errD_real = criterionGAN:forward(output_label, label)         --errD_real = -logD(Is)
    local df = criterionGAN:backward(output_label, label)
 	 df_do[opt.loss_layer+1] = df
    netD:backward(batch_im_out_per, df_do)
 
 	 -- generating fake images from generator
-   local fake = netG:forward({batch_doafn_out_masked, batch_doafn_feat, batch_view_in, mean_pixel})
+   local fake = netG:forward({batch_doafn_out_masked, batch_doafn_feat, batch_view_in, mean_pixel, batch_cdoafn_mask}) -- adding batch_cdoafn_mask to the input of netG:forward
    batch_im_fake:copy(fake)
-   
+
 	 -- processing fake images
 	 label:fill(fake_label)
    local out = netD:forward(batch_im_fake)
    local output_label = out[opt.loss_layer+1]
-   local errD_fake = criterionGAN:forward(output_label, label)
+   local errD_fake = criterionGAN:forward(output_label, label)       --errD_fake = -log(1-D(G(Is)))
    local df = criterionGAN:backward(output_label, label)
 	 df_do[opt.loss_layer+1] = df
    netD:backward(batch_im_fake, df_do)
 
+   -- total loss for D = errD_real + errD_fake
    return errD_real + errD_fake, gradParametersD
 end
 
@@ -257,7 +264,7 @@ local fGx = function(x)
    gradParametersD:zero()
    gradParametersG:zero()
 
-   local fake = netG:forward({batch_doafn_out_masked, batch_doafn_feat, batch_view_in, mean_pixel})
+   local fake = netG:forward({batch_doafn_out_masked, batch_doafn_feat, batch_view_in, mean_pixel, batch_cdoafn_mask})
    batch_im_fake:copy(fake)
 
 	 -- GAN LOSS and FEATURE MATCHING
@@ -279,14 +286,14 @@ local fGx = function(x)
 	 for l=1,opt.loss_layer do
 		 local err = criterion_pixel:forward(feat_fake[l], feat_real[l])
 		 local derr = criterion_pixel:backward(feat_fake[l], feat_real[l])
-		 feat_err = feat_err + err
+		 feat_err = feat_err + err                             --feat_err = lambda1*L2(FD(G(Is)) - FD(It))
 		 table.insert(df_do,derr:clone():mul(opt.lambda1))
 	 end
 
 	 -- fake labels are real for generator cost
    local output_label = out[opt.loss_layer+1]
 	 label:fill(real_label)
-	 local errG = criterionGAN:forward(output_label, label)
+	 local errG = criterionGAN:forward(output_label, label)    --errG = -logD(G(Is))
 	 local df = criterionGAN:backward(output_label, label)
 	 table.insert(df_do,df:clone())
 
@@ -308,17 +315,18 @@ local fGx = function(x)
 	 for l=1,opt.loss_layer do
 		 local err = criterion_pixel:forward(feat_fake_per[l], feat_gt_per[l])
 		 local derr = criterion_pixel:backward(feat_fake_per[l], feat_gt_per[l])
-		 feat_err_per = feat_err_per + err
+		 feat_err_per = feat_err_per + err                      --feat_err_per = beta*L2(Fvgg(G(Is)) - Fvgg(It))
 		 table.insert(d_feat_per,derr:clone())
 	 end
 	 local df_do2 = lossnet:updateGradInput(batch_im_fake,d_feat_per)
+   df_do2:mul(opt.lambda2)
+
 	 if opt.tv_weight > 0 then
-		 local d_tvloss = tvloss:updateGradInput(batch_im_fake,0)
+		 local d_tvloss = tvloss:updateGradInput(batch_im_fake,0)      --d_tvloss = tv_weight*LTV(G(Is))  (for denoising purposes)
 		 --print(torch.abs(df_do2):mean(), torch.abs(df_do2):max(), torch.abs(df_do2):min())
 		 --print(torch.abs(d_tvloss):mean(),torch.abs(d_tvloss):max(), torch.abs(d_tvloss):min() )
-		 df_do2:add(d_tvloss)
+		 df_do2:add(d_tvloss:mul(tv_weight))
 	 end
-	 df_do2:mul(opt.lambda2)
 
 	 -- compute error in pixel level
 	 --local d_pxloss
@@ -333,8 +341,8 @@ local fGx = function(x)
 	 --print(torch.abs(df_do1):mean(),torch.abs(df_do1):max(), torch.abs(df_do1):min() )
 	 --print(torch.abs(df_do2):mean(),torch.abs(df_do2):max(), torch.abs(df_do2):min() )
 
-	 netG:backward( {batch_doafn_out_masked, batch_doafn_feat, batch_view_in, mean_pixel}, df_do1:add(df_do2):add(d_pxloss) )
-	 
+	 netG:backward( {batch_doafn_out_masked, batch_doafn_feat, batch_view_in, mean_pixel, batch_cdoafn_mask}, df_do1:add(df_do2):add(d_pxloss) )
+
    return errG, gradParametersG
 end
 
@@ -343,7 +351,7 @@ local get_batch = function()
 	batch_im_out_per:copy(batch_im_out)
 	-- make it [0, 1] -> [0, 255], and BGR, subtract mean
 	batch_im_out_per:mul(255)
-	batch_im_out_per = batch_im_out_per:index(2,perm)	
+	batch_im_out_per = batch_im_out_per:index(2,perm)
 	batch_im_out_per:add(-1,mean_pixel)
 
 	-- make it [0, 1] -> [-1, 1]
@@ -364,6 +372,8 @@ local get_batch = function()
 	batch_doafn_out_masked:add(-1)
 
 	batch_doafn_feat:copy(doafn.forwardnodes[doafn_feat_idx].data.module.output)
+
+  batch_cdoafn_mask:copy(f[3]:repeatTensor(1,3,1,1))
 end
 
 for t = epoch+1, opt.maxEpoch do
@@ -395,7 +405,7 @@ for t = epoch+1, opt.maxEpoch do
 		loss_listD = torch.cat(loss_listD, torch.Tensor(1,1):fill(errD[1]),1)
 		loss_listG = torch.cat(loss_listG, torch.Tensor(1,1):fill(errG[1]),1)
 
-		-- plot 
+		-- plot
 		if iter % 250 == 0 then
 			local nrow = 4
 			local to_plot={}
@@ -410,9 +420,10 @@ for t = epoch+1, opt.maxEpoch do
 				to_plot[(k-1)*nrow + 3]:add(1):mul(0.5)
 				to_plot[(k-1)*nrow + 4] = batch_im_out[k]:clone()
 				to_plot[(k-1)*nrow + 4]:add(1):mul(0.5)
+        to_plot[(k-1)*nrow + 5] = batch_cdoafn_mask[k]:clone() --predict counter
 			end
 			formatted = image.toDisplayTensor({input=to_plot, nrow = nrow})
-			image.save((opt.modelPath .. '/training/' .. 
+			image.save((opt.modelPath .. '/training/' ..
 					string.format('training_output_%05d.jpg',iter)), formatted)
 
 			-- plot errors
@@ -429,18 +440,18 @@ for t = epoch+1, opt.maxEpoch do
 			gnuplot.pngfigure(opt.modelPath .. string.format('/gan_loss_epoch-%d.png',t))
 			gnuplot.plot({'D',lossD,'-'},{'G',lossG,'-'})
 			gnuplot.plotflush()
-			
+
 			--io.stdin:read('*l')
 		end
 
 	end
-	
+
   if t % opt.saveFreq == 0 then
 			collectgarbage()
 			parametersD, gradParametersD = nil, nil -- nil them to avoid spiking memory
 			parametersG, gradParametersG = nil, nil
 			torch.save(opt.modelPath .. string.format('/net-epoch-%d.t7', t),
-				{netG = netG:clearState(), netD = netD:clearState(), loss_listD = loss_listD, 
+				{netG = netG:clearState(), netD = netD:clearState(), loss_listD = loss_listD,
 				loss_listG = loss_listG})
 			parametersD, gradParametersD = netD:getParameters()
 			parametersG, gradParametersG = netG:getParameters()
