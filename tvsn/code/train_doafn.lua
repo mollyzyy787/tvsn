@@ -162,7 +162,7 @@ for t = epoch+1, opt.maxEpoch do
 		-- plot 
 		if iter % 250 == 0 then
 			to_plot={}
-			for k=1,10 do
+			for k=1,opt.batchSize do
 				to_plot[(k-1)*5 + 1] = f[1][k]
 				to_plot[(k-1)*5 + 1]:add(1):mul(0.5)
 				to_plot[(k-1)*5 + 2] = f[2][k]:repeatTensor(3,1,1)

@@ -14,7 +14,7 @@ opt = lapp[[
   --dataset						(default 'doafn')
 	--split							(default 'train')
   --saveFreq          (default 20)
-  --modelString       (default 'DOAFN_SYM')
+  --modelString       (default 'CDOAFN_SYM')
   -g, --gpu           (default 0)
   --imgscale          (default 256)
   --background				(default 0)
@@ -119,7 +119,7 @@ local parameters, gradParameters = net:getParameters()
 
 -- create closure to evaluate f(X) and df/dX of discriminator (Xiaobai: not discriminator, but doafn?)
 local opfunc = function(x)
-  collectgarbage()
+  	collectgarbage()
 	gradParameters:zero()
 
 	f = net:forward({batch_im_in, batch_view_in})
@@ -131,7 +131,7 @@ local opfunc = function(x)
 	local df_d_map = criterion_map:backward(f[2], batch_map)
 
 	map2_err = criterion_map2:forward(f[3], batch_map2)
-	local df_d_map2 = criterion_map2:backward(f[3], batch_map3)
+	local df_d_map2 = criterion_map2:backward(f[3], batch_map2)
 
 	net:backward({batch_im_in, batch_view_in}, {df_d_im:mul(2),df_d_map,df_d_map2})
 
@@ -149,8 +149,10 @@ for t = epoch+1, opt.maxEpoch do
 		local iter = i+(t-1)*opt.iter_per_epoch
 		data_tm:reset(); data_tm:resume()
 		batch_im_in, batch_im_out, batch_map, batch_view_in = data:getBatch()
+		batch_map2 = torch.sum(batch_im_out,2) -- calculate contour from batch_im_out
+		batch_map2 = torch.floor(batch_map2:mul(1/3))
+		batch_map2 = batch_map2:add(-1):mul(-1)
 		-- make it [0, 1] -> [-1, 1]
-		batch_map2 = torch.ceil(batch_im_in) -- calculate contour from batch_im_in
 		batch_im_in:mul(2):add(-1)
     	batch_im_out:mul(2):add(-1)
 
@@ -158,6 +160,7 @@ for t = epoch+1, opt.maxEpoch do
 			batch_im_in = batch_im_in:cuda()
 			batch_im_out = batch_im_out:cuda()
 			batch_map = batch_map:cuda()
+			batch_map2 = batch_map2:cuda()
 			batch_view_in = batch_view_in:cuda()
 		end
 		data_tm:stop()
@@ -165,26 +168,28 @@ for t = epoch+1, opt.maxEpoch do
 		tm:reset(); tm:resume()
 		optim.adam(opfunc, parameters, optimState)
 		tm:stop()
-		print(string.format('#### epoch (%d)\t iter (%d) \t TrainError(IM/Mask)=(%.4f,%.4f)'
-							.. ' Time: %.3f DataTime: %.3f ', t, iter, im_err, map_err, 
+		print(string.format('#### epoch (%d)\t iter (%d) \t TrainError(IM/Mask)=(%.4f,%.4f,%.4f)'
+							.. ' Time: %.3f DataTime: %.3f ', t, iter, im_err, map_err, map2_err,
 							tm:time().real, data_tm:time().real))
 		loss_list_im = torch.cat(loss_list_im, torch.Tensor(1,1):fill(im_err),1)
 		loss_list_map = torch.cat(loss_list_map, torch.Tensor(1,1):fill(map_err),1)
-
+		loss_list_map2 = torch.cat(loss_list_map2, torch.Tensor(1,1):fill(map2_err),1)
 		-- plot 
 		if iter % 250 == 0 then
 			to_plot={}
-			for k=1,10 do
-				to_plot[(k-1)*5 + 1] = f[1][k]
-				to_plot[(k-1)*5 + 1]:add(1):mul(0.5)
-				to_plot[(k-1)*5 + 2] = f[2][k]:repeatTensor(3,1,1)
-				to_plot[(k-1)*5 + 3] = batch_im_in[k]
-				to_plot[(k-1)*5 + 3]:add(1):mul(0.5)
-				to_plot[(k-1)*5 + 4] = batch_im_out[k]
-				to_plot[(k-1)*5 + 4]:add(1):mul(0.5)
-				to_plot[(k-1)*5 + 5] = batch_map[k]:repeatTensor(3,1,1)
+			for k=1,opt.batchSize do
+				to_plot[(k-1)*7 + 1] = f[1][k]
+				to_plot[(k-1)*7 + 1]:add(1):mul(0.5) --generated image
+				to_plot[(k-1)*7 + 2] = f[2][k]:repeatTensor(3,1,1) --generated vis map
+				to_plot[(k-1)*7 + 3] = f[3][k]:repeatTensor(3,1,1) --generated contour map
+				to_plot[(k-1)*7 + 4] = batch_im_in[k] --source image
+				to_plot[(k-1)*7 + 4]:add(1):mul(0.5)
+				to_plot[(k-1)*7 + 5] = batch_im_out[k] --target image
+				to_plot[(k-1)*7 + 5]:add(1):mul(0.5)
+				to_plot[(k-1)*7 + 6] = batch_map[k]:repeatTensor(3,1,1) --true vis map
+				to_plot[(k-1)*7 + 7] = batch_map2[k]:repeatTensor(3,1,1) --true contour map
 			end
-			formatted = image.toDisplayTensor({input=to_plot, nrow = 5})
+			formatted = image.toDisplayTensor({input=to_plot, nrow = 7})
 			image.save((opt.modelPath .. '/training/' .. 
 					string.format('training_output_%05d.jpg',iter)), formatted)
 			--io.stdin:read('*l')
@@ -195,7 +200,7 @@ for t = epoch+1, opt.maxEpoch do
 			collectgarbage()
 			parameters, gradParameters = nil, nil
 			torch.save(opt.modelPath .. string.format('/net-epoch-%d.t7', t),
-				{net = net:clearState(), loss_list_im = loss_list_im, loss_list_map = loss_list_map})
+				{net = net:clearState(), loss_list_im = loss_list_im, loss_list_map = loss_list_map, loss_list_map2 = loss_list_map2})
 			parameters, gradParameters = net:getParameters()
   end
 end
