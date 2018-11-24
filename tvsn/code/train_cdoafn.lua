@@ -20,7 +20,7 @@ opt = lapp[[
   --background				(default 0)
   --nThreads					(default 8)
   --maxEpoch          (default 200)
-  --iter_per_epoch		(default 10)
+  --iter_per_epoch		(default 1000)
   --batchSize         (default 25)
   --lr								(default 0.0001)
   --beta1							(default 0.9)
@@ -175,7 +175,7 @@ for t = epoch+1, opt.maxEpoch do
 		loss_list_map = torch.cat(loss_list_map, torch.Tensor(1,1):fill(map_err),1)
 		loss_list_map2 = torch.cat(loss_list_map2, torch.Tensor(1,1):fill(map2_err),1)
 		-- plot 
-		if iter % 1 == 0 then
+		if iter % 250 == 0 then
 			to_plot={}
 			for k=1,opt.batchSize do
 				to_plot[(k-1)*7 + 1] = f[1][k]
