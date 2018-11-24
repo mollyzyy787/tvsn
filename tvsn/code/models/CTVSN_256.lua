@@ -14,10 +14,12 @@ function DCGAN.create_netG(opts)
 	local input_im_feat = nn.Identity()()
 	local input_view = nn.Identity()()
 	local mean = nn.Identity()()
+	local output_mask = nn.Identity()()
 	table.insert(inputs,input_im)
 	table.insert(inputs,input_im_feat)
 	table.insert(inputs,input_view)
 	table.insert(inputs,mean)
+	table.insert(inputs,output_mask)
 
   -- 3 x 256 x 256 
 	local en_conv1 = nn.LeakyReLU(0.2, true)(cudnn.SpatialBatchNormalization(16)(cudnn.SpatialConvolution(3,16,4,4,2,2,1,1)(input_im)))
@@ -88,9 +90,10 @@ function DCGAN.create_netG(opts)
 
 	local im = nn.MulConstant(127.5,false)(nn.AddConstant(1,false)(tanh_out))
 	local trans_im = nn.CSubTable()({im,mean})
+	local trans_im_masked = nn.CMulTable()({trans_im,output_mask})
 
 	local outputs = {}
-	table.insert(outputs,trans_im)
+	table.insert(outputs,trans_im_masked)
 
 	return nn.gModule(inputs, outputs)
 end

@@ -93,7 +93,6 @@ function DCGAN.create_netG(opts)
 	local trans_im_masked = nn.CMulTable()({trans_im,output_mask})
 
 	local outputs = {}
-	-- table.insert(outputs,trans_im)
 	table.insert(outputs,trans_im_masked)
 
 	return nn.gModule(inputs, outputs)
