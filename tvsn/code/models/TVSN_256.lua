@@ -19,7 +19,9 @@ function DCGAN.create_netG(opts)
 	table.insert(inputs,input_view)
 	table.insert(inputs,mean)
 
-  -- 3 x 256 x 256 
+  -- 3 x 256 x 256
+-- Molly:
+-- SpatialConvolution:__init(nInputPlane, nOutputPlane, kW, kH, dW, dH, padW, padH, groups)
 	local en_conv1 = nn.LeakyReLU(0.2, true)(cudnn.SpatialBatchNormalization(16)(cudnn.SpatialConvolution(3,16,4,4,2,2,1,1)(input_im)))
   -- 16 x 128 x 128
 	local en_conv2 = nn.LeakyReLU(0.2, true)(cudnn.SpatialBatchNormalization(32)(cudnn.SpatialConvolution(16,32,4,4,2,2,1,1)(en_conv1)))
@@ -27,12 +29,12 @@ function DCGAN.create_netG(opts)
 	local en_conv3 = nn.LeakyReLU(0.2, true)(cudnn.SpatialBatchNormalization(64)((cudnn.SpatialConvolution(32,64,4,4,2,2,1,1)(en_conv2))))
   -- 64 x 32 x 32
 	local en_conv4 = nn.LeakyReLU(0.2, true)(cudnn.SpatialBatchNormalization(128)((cudnn.SpatialConvolution(64,128,4,4,2,2,1,1)(en_conv3))))
-  -- 128 x 16 x 16 
+  -- 128 x 16 x 16
 	local en_conv5 = nn.LeakyReLU(0.2, true)(cudnn.SpatialBatchNormalization(256)((cudnn.SpatialConvolution(128,256,4,4,2,2,1,1)(en_conv4))))
   -- 256 x 8 x 8
 	local en_conv6 = nn.LeakyReLU(0.2, true)(cudnn.SpatialBatchNormalization(512)((cudnn.SpatialConvolution(256,512,4,4,2,2,1,1)(en_conv5))))
   -- 512 x 4 x 4
-	
+
 	-- view
 	local view_fc1 = cudnn.ReLU()(nn.Linear(17,128)(input_view))
 	local view_fc2 = nn.Reshape(opts.batchSize, 128, 1, 1)(cudnn.ReLU()(nn.Linear(128,128)(view_fc1)))
@@ -47,7 +49,7 @@ function DCGAN.create_netG(opts)
 	-- (512+128) x 4 x 4
 	local concat3 = cudnn.SpatialFullConvolution(512,512,3,3,1,1,1,1)(concat2)
 	local concat3 = cudnn.ReLU()(cudnn.SpatialBatchNormalization(512)(concat3))
-	
+
 	-- decoder
 	-- 512 x 4 x 4
 	local de_deconv1 = cudnn.SpatialFullConvolution(512,256,4,4,2,2,1,1)(concat3)
@@ -59,13 +61,13 @@ function DCGAN.create_netG(opts)
 	local de_deconv2 = cudnn.ReLU()(cudnn.SpatialBatchNormalization(128)(de_deconv2))
 	local de_deconv2 = cudnn.SpatialConvolution(128,128,3,3,1,1,1,1)(de_deconv2)
 	local de_deconv2 = cudnn.ReLU()(cudnn.SpatialBatchNormalization(128)(de_deconv2))
-	-- 128 x 16 x16 
+	-- 128 x 16 x16
 	local de_deconv3 = cudnn.SpatialFullConvolution(128,64,4,4,2,2,1,1)(de_deconv2)
 	local de_deconv3 = cudnn.ReLU()(cudnn.SpatialBatchNormalization(64)(de_deconv3))
 	local de_skip3 = nn.JoinTable(2)({de_deconv3,en_conv3})
 	local de_skip3 = cudnn.SpatialConvolution(64+64,64,3,3,1,1,1,1)(de_skip3)
 	local de_skip3 = cudnn.ReLU()(cudnn.SpatialBatchNormalization(64)(de_skip3))
-	-- 64 x 32 x 32 
+	-- 64 x 32 x 32
 	local de_deconv4 = cudnn.SpatialFullConvolution(64,32,4,4,2,2,1,1)(de_skip3)
 	local de_deconv4 = cudnn.ReLU()(cudnn.SpatialBatchNormalization(32)(de_deconv4))
 	local de_skip4 = nn.JoinTable(2)({de_deconv4,en_conv2})
@@ -77,7 +79,7 @@ function DCGAN.create_netG(opts)
 	local de_skip5 = nn.JoinTable(2)({de_deconv5,en_conv1})
 	local de_skip5 = cudnn.SpatialConvolution(16+16,16,3,3,1,1,1,1)(de_skip5)
 	local de_skip5 = cudnn.ReLU()(cudnn.SpatialBatchNormalization(16)(de_skip5))
-	-- 16 x 128 x 128 
+	-- 16 x 128 x 128
 	local de_deconv6 = cudnn.SpatialFullConvolution(16,16,4,4,2,2,1,1)(de_skip5)
 	local de_deconv6 = cudnn.ReLU()(cudnn.SpatialBatchNormalization(16)(de_deconv6))
 	local de_skip6 = nn.JoinTable(2)({de_deconv6,input_im})
@@ -98,7 +100,7 @@ end
 function DCGAN.create_netD(opts)
 	local input_im = nn.Identity()()
 
-  -- 3 x 256 x 256 
+  -- 3 x 256 x 256
 	local en_conv1 = nn.LeakyReLU(0.2, true)(cudnn.SpatialBatchNormalization(64)(cudnn.SpatialConvolution(3,64,4,4,2,2,1,1)(input_im))):annotate{name='feat1'}
   -- 16 x 128 x 128
 	local en_conv2 = nn.LeakyReLU(0.2, true)(cudnn.SpatialBatchNormalization(64)(cudnn.SpatialConvolution(64,64,4,4,2,2,1,1)(en_conv1))):annotate{name='feat2'}
@@ -106,7 +108,7 @@ function DCGAN.create_netD(opts)
 	local en_conv3 = nn.LeakyReLU(0.2, true)(cudnn.SpatialBatchNormalization(64)((cudnn.SpatialConvolution(64,64,4,4,2,2,1,1)(en_conv2)))):annotate{name='feat3'}
   -- 64 x 32 x 32
 	local en_conv4 = nn.LeakyReLU(0.2, true)(cudnn.SpatialBatchNormalization(128)((cudnn.SpatialConvolution(64,128,4,4,2,2,1,1)(en_conv3)))):annotate{name='feat4'}
-  -- 128 x 16 x 16 
+  -- 128 x 16 x 16
 	local en_conv5 = nn.LeakyReLU(0.2, true)(cudnn.SpatialBatchNormalization(256)((cudnn.SpatialConvolution(128,256,4,4,2,2,1,1)(en_conv4)))):annotate{name='feat5'}
   -- 256 x 8 x 8
 	local en_conv6 = nn.LeakyReLU(0.2, true)(cudnn.SpatialBatchNormalization(512)((cudnn.SpatialConvolution(256,512,4,4,2,2,1,1)(en_conv5)))):annotate{name='feat6'}
@@ -123,4 +125,4 @@ function DCGAN.create_netD(opts)
 
 	return nn.gModule(inputs, outputs)
 end
-return DCGAN 
+return DCGAN
