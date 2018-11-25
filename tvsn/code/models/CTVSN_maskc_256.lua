@@ -45,7 +45,7 @@ function DCGAN.create_netG(opts)
 
 	-- code
 	-- (512+128) x 4 x 4
-	local concat2 = cudnn.SpatialFullConvolution(512+512+128+512,512,3,3,1,1,1,1)(concat1)
+	local concat2 = cudnn.SpatialFullConvolution(512+512+128,512,3,3,1,1,1,1)(concat1)
 	local concat2 = cudnn.ReLU()(cudnn.SpatialBatchNormalization(512)(concat2))
 	-- (512+128) x 4 x 4
 	local concat3 = cudnn.SpatialFullConvolution(512,512,3,3,1,1,1,1)(concat2)
