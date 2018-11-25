@@ -2,7 +2,7 @@ require 'torch'
 require 'cutorch'
 require 'nn'
 require 'cunn'
--- require 'cudnn'
+require 'cudnn'
 require 'optim'
 require 'image'
 require 'paths'
@@ -14,13 +14,13 @@ opt = lapp[[
   --dataset						(default 'tvsn')
 	--split							(default 'train')
   --saveFreq          (default 20)
-  --modelString       (default 'CTVSN2_maskc')
+  --modelString       (default 'CTVSN_maskc')
   -g, --gpu           (default 0)
   --imgscale          (default 256)
   --background				(default 0)
   --nThreads					(default 8)
   --maxEpoch          (default 200)
-  --iter_per_epoch		(default 10)
+  --iter_per_epoch		(default 1)
   --batchSize         (default 15)
   --lossnet						(default 'vgg16')
   --lr								(default 0.0001)
@@ -39,6 +39,10 @@ opt = lapp[[
 	-d, --debug					(default 0)
 ]]
 
+--beta1 is the hyperparameter for GD with momentum, used in adam optimization
+--lambda1 is the coefficient for netD feature level loss
+--lambda2 is the coefficient for vgg feature level loss
+
 print(opt)
 if opt.debug > 0 then
 	debugger = require('fb.debugger')
@@ -54,7 +58,7 @@ torch.setdefaulttensortype('torch.FloatTensor')
 
 opt.modelName = string.format('%s_%s_%s_bs%03d', opt.modelString, opt.imgscale, opt.category, opt.batchSize)
 -- opt.doafnName = string.format('CDOAFN_SYM_%s_%s_bs025',opt.imgscale, opt.category)
-opt.doafnName = string.format('CDOAFN2_SYM_%s_%s_bs002',opt.imgscale, opt.category) --Xiaobai
+opt.doafnName = string.format('CDOAFN_SYM_%s_%s_bs025',opt.imgscale, opt.category) --Xiaobai
 opt.modelPath = opt.modelDir .. opt.modelName
 if not paths.dirp(opt.modelPath) then
   paths.mkdir(opt.modelPath)
@@ -115,10 +119,7 @@ function TVLoss:updateGradInput(input, gradOutput)
 end
 
 print('loading lossnet for perceptual loss...')
--- lossnet = torch.load(string.format('lossnet/%s_l%d.t7',opt.lossnet,opt.loss_layer))
-lossnet_module = dofile('lossnet/vgg16_l3_2.lua')
-lossnet = lossnet_module.create()
-lossnet:apply(weights_init) --Xiaobai, create own loss net
+lossnet = torch.load(string.format('lossnet/%s_l%d.t7',opt.lossnet,opt.loss_layer))
 if opt.tv_weight > 0 then
 	tvloss = nn.TVLoss(opt.tv_weight):float()
 end
@@ -133,7 +134,7 @@ print("Dataset: " .. opt.dataset .. " nTotal: " .. ntrain+ntest .. " nTrain: " .
 
 print('loading pretrained doafn ...')
 -- local doafn_loader = torch.load(opt.modelDir .. opt.doafnName .. '/net-epoch-200.t7')
-local doafn_loader = torch.load(opt.modelDir .. opt.doafnName .. '/net-epoch-2.t7') --Xiaobai
+local doafn_loader = torch.load(opt.modelDir .. opt.doafnName .. '/net-epoch-200.t7') --Xiaobai
 local doafn = doafn_loader.net
 
 -- load model from current learning stage
