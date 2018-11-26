@@ -98,7 +98,7 @@ function DCGAN.create_netG(opts)
 	local output = nn.CAddTable(){tanh_out_masked,addtional_background}:annotate{name='output'}
 	-- 3 x 256 x 256
 
-	local im = nn.MulConstant(127.5,false)(nn.AddConstant(1,false)(tanh_out)) --[0,1]->[0,255]
+	local im = nn.MulConstant(127.5,false)(nn.AddConstant(1,false)(output)) --[0,1]->[0,255]
 	local trans_im = nn.CSubTable()({im,mean})
 
 	local outputs = {}
