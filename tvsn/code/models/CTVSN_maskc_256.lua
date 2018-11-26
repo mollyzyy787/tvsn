@@ -94,6 +94,8 @@ function DCGAN.create_netG(opts)
 
 	local outputs = {}
 	table.insert(outputs,trans_im)
+
+	return nn.gModule(inputs, outputs)
 end
 
 function DCGAN.create_netD(opts)
