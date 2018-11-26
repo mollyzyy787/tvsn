@@ -432,7 +432,7 @@ for t = epoch+1, opt.maxEpoch do
 
 		-- plot
 		if iter % plot_err_gap == 0 then --Xiaobai
-			local nrow = 9
+			local nrow = 8
 			local to_plot={}
 			local tanh_out = netG.forwardnodes[tanh_out_idx].data.module.output:clone()
 			tanh_out = tanh_out:index(2,perm)
@@ -459,7 +459,6 @@ for t = epoch+1, opt.maxEpoch do
 				to_plot[(k-1)*nrow + 7] = batch_im_out[k]:clone() --target
 				to_plot[(k-1)*nrow + 7]:add(1):mul(0.5)
 				to_plot[(k-1)*nrow + 8] = batch_cdoafn_mask[k]:repeatTensor(3,1,1):clone() --predict counter
-				to_plot[(k-1)*nrow + 9] = batch_cdoafn_mask[k]:mul(-1):add(1):repeatTensor(3,1,1):clone() --predict counter
 			end
 			formatted = image.toDisplayTensor({input=to_plot, nrow = nrow})
 			image.save((opt.modelPath .. '/training/' ..
