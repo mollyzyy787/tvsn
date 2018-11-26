@@ -453,6 +453,7 @@ for t = epoch+1, opt.maxEpoch do
 				to_plot[(k-1)*nrow + 4]:add(1):mul(0.5)
 				to_plot[(k-1)*nrow + 5] = output[k]
 				to_plot[(k-1)*nrow + 5]:add(1):mul(0.5)
+				to_plot[(k-1)*nrow + 5]:clamp(0.0,1.0) --clamp to 0.0-1.0 to work with toDisplayTensor
 				to_plot[(k-1)*nrow + 6] = batch_im_in[k]:clone() --source
 				to_plot[(k-1)*nrow + 6]:add(1):mul(0.5)
 				to_plot[(k-1)*nrow + 7] = batch_im_out[k]:clone() --target
