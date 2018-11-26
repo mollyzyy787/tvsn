@@ -428,8 +428,6 @@ for t = epoch+1, opt.maxEpoch do
 				to_plot[(k-1)*nrow + 1] = batch_doafn_out_masked[k]:clone() --masked doafn output
 				to_plot[(k-1)*nrow + 1]:add(1):mul(0.5)
 				to_plot[(k-1)*nrow + 2] = pred[k] --tvsn output
-				print(pred[k]:max())
-				print(pred[k]:min())
 				to_plot[(k-1)*nrow + 2]:add(1):mul(0.5)
 				to_plot[(k-1)*nrow + 3] = batch_im_in[k]:clone() --source
 				to_plot[(k-1)*nrow + 3]:add(1):mul(0.5)
