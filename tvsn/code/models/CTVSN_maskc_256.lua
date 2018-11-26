@@ -87,24 +87,13 @@ function DCGAN.create_netG(opts)
 	local de_skip6 = cudnn.SpatialConvolution(16+3,16,3,3,1,1,1,1)(de_skip6)
 	local de_skip6 = cudnn.ReLU()(cudnn.SpatialBatchNormalization(16)(de_skip6))
 	local tanh_out = nn.Tanh()(cudnn.SpatialConvolution(16,3,3,3,1,1,1,1)(de_skip6)):annotate{name='tanh_out'}
-
-	local tanh_out_shifted = nn.MulConstant(0.5,false)(nn.AddConstant(1,false)(tanh_out)) --[-1,1]->[0,1]
-	local tanh_out_masked_shifted = nn.CMulTable()({tanh_out_shifted,nn.Replicate(3,2)(output_mask)}):annotate{name='tanh_out_masked'} --[0,1]
-
-	local addtional_background_revsed = nn.Replicate(3,2)(output_mask) --[0,1]
-	local addtional_background_shifted = nn.AddConstant(1)(nn.MulConstant(-1)(addtional_background_revsed)):annotate{name='addback'} --[0,1]
-
-	local output_shifted = nn.CAddTable(){tanh_out_masked_shifted,addtional_background_shifted} --[0,1]
-	local output = nn.AddConstant(-1)(nn.MulConstant(2)(output_shifted)):annotate{name='output'} --[-1,1]
 	-- 3 x 256 x 256
 
-	local im = nn.MulConstant(127.5,false)(nn.AddConstant(1,false)(output)) --[-1,1]->[0,255]
+	local im = nn.MulConstant(127.5,false)(nn.AddConstant(1,false)(tanh_out))
 	local trans_im = nn.CSubTable()({im,mean})
 
 	local outputs = {}
 	table.insert(outputs,trans_im)
-
-	return nn.gModule(inputs, outputs)
 end
 
 function DCGAN.create_netD(opts)

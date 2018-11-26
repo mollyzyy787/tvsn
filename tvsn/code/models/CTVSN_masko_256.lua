@@ -21,9 +21,8 @@ function DCGAN.create_netG(opts)
 	table.insert(inputs,mean)
 	table.insert(inputs,output_mask)  --size of mask is 3 x imscale(256) x imscale
 
-	local input_im_maskc = nn.JoinTable(2)({input_im,output_mask})
   -- 3 x 256 x 256
-	local en_conv1 = nn.LeakyReLU(0.2, true)(cudnn.SpatialBatchNormalization(16)(cudnn.SpatialConvolution(4,16,4,4,2,2,1,1)(input_im_maskc)))
+	local en_conv1 = nn.LeakyReLU(0.2, true)(cudnn.SpatialBatchNormalization(16)(cudnn.SpatialConvolution(3,16,4,4,2,2,1,1)(input_im)))
   -- 16 x 128 x 128
 	local en_conv2 = nn.LeakyReLU(0.2, true)(cudnn.SpatialBatchNormalization(32)(cudnn.SpatialConvolution(16,32,4,4,2,2,1,1)(en_conv1)))
   -- 32 x 64 x 64

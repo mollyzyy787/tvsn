@@ -21,9 +21,8 @@ function DCGAN.create_netG(opts)
 	table.insert(inputs,mean)
 	table.insert(inputs,output_mask)  --size of mask is 3 x imscale(256) x imscale
 
-	local input_im_maskc = nn.JoinTable(2)({input_im,output_mask})
   -- 3 x 256 x 256
-	local en_conv1 = nn.LeakyReLU(0.2, true)(cudnn.SpatialBatchNormalization(16)(cudnn.SpatialConvolution(4,16,4,4,2,2,1,1)(input_im_maskc)))
+	local en_conv1 = nn.LeakyReLU(0.2, true)(cudnn.SpatialBatchNormalization(16)(cudnn.SpatialConvolution(3,16,4,4,2,2,1,1)(input_im)))
   -- 16 x 128 x 128
 	local en_conv2 = nn.LeakyReLU(0.2, true)(cudnn.SpatialBatchNormalization(32)(cudnn.SpatialConvolution(16,32,4,4,2,2,1,1)(en_conv1)))
   -- 32 x 64 x 64
@@ -41,11 +40,28 @@ function DCGAN.create_netG(opts)
 	local view_fc2 = nn.Reshape(opts.batchSize, 128, 1, 1)(cudnn.ReLU()(nn.Linear(128,128)(view_fc1)))
 	local view_conv = cudnn.SpatialFullConvolution(128,128,4,4)(view_fc2)
 	local view_conv = cudnn.ReLU()(cudnn.SpatialBatchNormalization(128)(view_conv))
-	local concat1 = nn.JoinTable(2)({en_conv6,input_im_feat,view_conv})
+
+  -- output mask
+	-- 1 x 256 x 256
+	local en_conv1_mask = nn.LeakyReLU(0.2, true)(cudnn.SpatialBatchNormalization(16)(cudnn.SpatialConvolution(1,16,4,4,2,2,1,1)(output_mask)))
+  -- 16 x 128 x 128
+	local en_conv2_mask = nn.LeakyReLU(0.2, true)(cudnn.SpatialBatchNormalization(32)(cudnn.SpatialConvolution(16,32,4,4,2,2,1,1)(en_conv1_mask)))
+  -- 32 x 64 x 64
+	local en_conv3_mask = nn.LeakyReLU(0.2, true)(cudnn.SpatialBatchNormalization(64)((cudnn.SpatialConvolution(32,64,4,4,2,2,1,1)(en_conv2_mask))))
+  -- 64 x 32 x 32
+	local en_conv4_mask = nn.LeakyReLU(0.2, true)(cudnn.SpatialBatchNormalization(128)((cudnn.SpatialConvolution(64,128,4,4,2,2,1,1)(en_conv3_mask))))
+  -- 128 x 16 x 16
+	local en_conv5_mask = nn.LeakyReLU(0.2, true)(cudnn.SpatialBatchNormalization(256)((cudnn.SpatialConvolution(128,256,4,4,2,2,1,1)(en_conv4_mask))))
+  -- 256 x 8 x 8
+	local en_conv6_mask = nn.LeakyReLU(0.2, true)(cudnn.SpatialBatchNormalization(512)((cudnn.SpatialConvolution(256,512,4,4,2,2,1,1)(en_conv5_mask))))
+  --512 x 4 x 4
+
+	--en_conv6 is 512 x 4 x 4, input_im_feat = 512 x 4 x 4, view_conv = 128 x 4 x 4, en_conv6 is 512 x 4 x 4
+	local concat1 = nn.JoinTable(2)({en_conv6,input_im_feat,view_conv, en_conv6_mask})
 
 	-- code
 	-- (512+128) x 4 x 4
-	local concat2 = cudnn.SpatialFullConvolution(512+512+128,512,3,3,1,1,1,1)(concat1)
+	local concat2 = cudnn.SpatialFullConvolution(512+512+128+512,512,3,3,1,1,1,1)(concat1)
 	local concat2 = cudnn.ReLU()(cudnn.SpatialBatchNormalization(512)(concat2))
 	-- (512+128) x 4 x 4
 	local concat3 = cudnn.SpatialFullConvolution(512,512,3,3,1,1,1,1)(concat2)
@@ -87,18 +103,9 @@ function DCGAN.create_netG(opts)
 	local de_skip6 = cudnn.SpatialConvolution(16+3,16,3,3,1,1,1,1)(de_skip6)
 	local de_skip6 = cudnn.ReLU()(cudnn.SpatialBatchNormalization(16)(de_skip6))
 	local tanh_out = nn.Tanh()(cudnn.SpatialConvolution(16,3,3,3,1,1,1,1)(de_skip6)):annotate{name='tanh_out'}
-
-	local tanh_out_shifted = nn.MulConstant(0.5,false)(nn.AddConstant(1,false)(tanh_out)) --[-1,1]->[0,1]
-	local tanh_out_masked_shifted = nn.CMulTable()({tanh_out_shifted,nn.Replicate(3,2)(output_mask)}):annotate{name='tanh_out_masked'} --[0,1]
-
-	local addtional_background_revsed = nn.Replicate(3,2)(output_mask) --[0,1]
-	local addtional_background_shifted = nn.AddConstant(1)(nn.MulConstant(-1)(addtional_background_revsed)):annotate{name='addback'} --[0,1]
-
-	local output_shifted = nn.CAddTable(){tanh_out_masked_shifted,addtional_background_shifted} --[0,1]
-	local output = nn.AddConstant(-1)(nn.MulConstant(2)(output_shifted)):annotate{name='output'} --[-1,1]
 	-- 3 x 256 x 256
 
-	local im = nn.MulConstant(127.5,false)(nn.AddConstant(1,false)(output)) --[-1,1]->[0,255]
+	local im = nn.MulConstant(127.5,false)(nn.AddConstant(1,false)(tanh_out))
 	local trans_im = nn.CSubTable()({im,mean})
 
 	local outputs = {}
