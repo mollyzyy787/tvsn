@@ -194,6 +194,8 @@ local data_tm = torch.Timer()
 local doafn_feat_idx = 18
 -- finding index of output(Tanh())
 local tanh_out_idx
+local tanh_out_masked_idx
+local addback_idx
 local output_idx
 for i,node in ipairs(netG.forwardnodes) do
 	name = node.data.annotations.name
@@ -202,6 +204,12 @@ for i,node in ipairs(netG.forwardnodes) do
 	end
 	if name == 'output' then
 		output_idx = i
+	end
+	if name == 'tanh_out_masked' then
+		tanh_out_masked_idx = i
+	end
+	if name == 'addback' then
+		addback_idx = i
 	end
 end
 print(tanh_out_idx, output_idx)
@@ -424,25 +432,33 @@ for t = epoch+1, opt.maxEpoch do
 
 		-- plot
 		if iter % plot_err_gap == 0 then --Xiaobai
-			local nrow = 7
+			local nrow = 9
 			local to_plot={}
-			local pred = netG.forwardnodes[tanh_out_idx].data.module.output:clone()
-			pred = pred:index(2,perm)
-			local pred_masked = netG.forwardnodes[output_idx].data.module.output:clone()
-			pred_masked = pred_masked:index(2,perm)
+			local tanh_out = netG.forwardnodes[tanh_out_idx].data.module.output:clone()
+			tanh_out = tanh_out:index(2,perm)
+			local tanh_out_masked = netG.forwardnodes[tanh_out_masked_idx].data.module.output:clone()
+			tanh_out_masked = tanh_out_masked:index(2,perm)
+			local addback = netG.forwardnodes[addback_idx].data.module.output:clone()
+			addback = addback:index(2,perm)
+			local output = netG.forwardnodes[output].data.module.output:clone()
+			output = output:index(2,perm)
 			for k=1,opt.batchSize do
 				to_plot[(k-1)*nrow + 1] = batch_doafn_out_masked[k]:clone() --masked doafn output
 				to_plot[(k-1)*nrow + 1]:add(1):mul(0.5)
-				to_plot[(k-1)*nrow + 2] = pred[k] --tvsn output
+				to_plot[(k-1)*nrow + 2] = tanh_out[k]
 				to_plot[(k-1)*nrow + 2]:add(1):mul(0.5)
-				to_plot[(k-1)*nrow + 3] = pred_masked[k] --tvsn output masked
+				to_plot[(k-1)*nrow + 3] = tanh_out_masked[k]
 				to_plot[(k-1)*nrow + 3]:add(1):mul(0.5)
-				to_plot[(k-1)*nrow + 4] = batch_im_in[k]:clone() --source
+				to_plot[(k-1)*nrow + 4] = addback[k]
 				to_plot[(k-1)*nrow + 4]:add(1):mul(0.5)
-				to_plot[(k-1)*nrow + 5] = batch_im_out[k]:clone() --target
+				to_plot[(k-1)*nrow + 5] = output[k]
 				to_plot[(k-1)*nrow + 5]:add(1):mul(0.5)
-				to_plot[(k-1)*nrow + 6] = batch_cdoafn_mask[k]:repeatTensor(3,1,1):clone() --predict counter
-				to_plot[(k-1)*nrow + 7] = batch_cdoafn_mask[k]:mul(-1):add(1):repeatTensor(3,1,1):clone() --predict counter
+				to_plot[(k-1)*nrow + 6] = batch_im_in[k]:clone() --source
+				to_plot[(k-1)*nrow + 6]:add(1):mul(0.5)
+				to_plot[(k-1)*nrow + 7] = batch_im_out[k]:clone() --target
+				to_plot[(k-1)*nrow + 7]:add(1):mul(0.5)
+				to_plot[(k-1)*nrow + 8] = batch_cdoafn_mask[k]:repeatTensor(3,1,1):clone() --predict counter
+				to_plot[(k-1)*nrow + 9] = batch_cdoafn_mask[k]:mul(-1):add(1):repeatTensor(3,1,1):clone() --predict counter
 			end
 			formatted = image.toDisplayTensor({input=to_plot, nrow = nrow})
 			image.save((opt.modelPath .. '/training/' ..

@@ -90,15 +90,15 @@ function DCGAN.create_netG(opts)
 
 	local tanh_out_shifted = nn.MulConstant(0.5,false)(nn.AddConstant(1,false)(tanh_out))
 	local tanh_out_masked_shifted = nn.CMulTable()({tanh_out_shifted,nn.Replicate(3,2)(output_mask)})
-	local tanh_out_masked = nn.AddConstant(-1)(nn.MulConstant(2)(tanh_out_masked_shifted))
+	local tanh_out_masked = nn.AddConstant(-1)(nn.MulConstant(2)(tanh_out_masked_shifted)):annotate{name='tanh_out_masked'}
 
 	local addtional_background_single = nn.AddConstant(1)(nn.MulConstant(-1)(output_mask))
-	local addtional_background = nn.Replicate(3,2)(nn.AddConstant(-1)(nn.MulConstant(2)(addtional_background_single)))
+	local addtional_background = nn.Replicate(3,2)(nn.AddConstant(-1)(nn.MulConstant(2)(addtional_background_single))):annotate{name='addback'}
 
 	local output = nn.CAddTable(){tanh_out_masked,addtional_background}:annotate{name='output'}
 	-- 3 x 256 x 256
 
-	local im = nn.MulConstant(127.5,false)(nn.AddConstant(1,false)(output)) --[0,1]->[0,255]
+	local im = nn.MulConstant(127.5,false)(nn.AddConstant(1,false)(output)) --[-1,1]->[0,255]
 	local trans_im = nn.CSubTable()({im,mean})
 
 	local outputs = {}
