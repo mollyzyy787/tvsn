@@ -450,7 +450,7 @@ for t = epoch+1, opt.maxEpoch do
 				lossG[k] = listG[(k-1)*plot_err_gap+1][1]
 			end
 			gnuplot.pngfigure(opt.modelPath .. string.format('/gan_loss_epoch-%d.png',t))
-			gnuplot.plot({'D',lossD,'-'},{'G',lossG,'-'})
+			gnuplot.plot({'D loss',lossD,'-'},{'G loss',lossG,'-'})
 			gnuplot.plotflush()
 
 			--io.stdin:read('*l')

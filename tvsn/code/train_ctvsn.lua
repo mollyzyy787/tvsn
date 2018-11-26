@@ -20,13 +20,14 @@ opt = lapp[[
   --background				(default 0)
   --nThreads					(default 8)
   --maxEpoch          (default 200)
-  --iter_per_epoch		(default 1000)
+  --iter_per_epoch		(default 1)
   --batchSize         (default 15)
   --lossnet						(default 'vgg16')
   --lr								(default 0.0001)
   --beta1							(default 0.5)
   --lambda1						(default 100)
   --lambda2						(default 0.001)
+  --contour_weight           (default 0.0)
 	--iterG							(default 2)
   --loss_layer				(default 3)
 	--tv_weight					(default 0.0001)
@@ -55,9 +56,9 @@ torch.manualSeed(opt.manualSeed)
 torch.setnumthreads(opt.nThreads)
 torch.setdefaulttensortype('torch.FloatTensor')
 
-opt.modelName = string.format('%s_%s_%s_bs%03d', opt.modelString, opt.imgscale, opt.category, opt.batchSize)
+opt.modelName = string.format('%s_%s_%s_bs%03d_baseline', opt.modelString, opt.imgscale, opt.category, opt.batchSize)
 -- opt.doafnName = string.format('CDOAFN_SYM_%s_%s_bs025',opt.imgscale, opt.category)
-opt.doafnName = string.format('DOAFN_SYM_%s_%s_bs001',opt.imgscale, opt.category) --Xiaobai
+opt.doafnName = string.format('CDOAFN_SYM_%s_%s_bs025',opt.imgscale, opt.category) --Xiaobai
 opt.modelPath = opt.modelDir .. opt.modelName
 if not paths.dirp(opt.modelPath) then
   paths.mkdir(opt.modelPath)
@@ -66,7 +67,7 @@ if not paths.dirp(opt.modelPath .. '/training/') then
   paths.mkdir(opt.modelPath .. '/training/')
 end
 
-if opt.gpu < 0 or opt.gpu > 3 then opt.gpu = -1 end
+-- if opt.gpu < 0 or opt.gpu > 3 then opt.gpu = -1 end
 if opt.gpu >= 0 then
   cutorch.setDevice(opt.gpu+1)
   print('<gpu> using device ' .. opt.gpu)
@@ -133,7 +134,7 @@ print("Dataset: " .. opt.dataset .. " nTotal: " .. ntrain+ntest .. " nTrain: " .
 
 print('loading pretrained doafn ...')
 -- local doafn_loader = torch.load(opt.modelDir .. opt.doafnName .. '/net-epoch-200.t7')
-local doafn_loader = torch.load(opt.modelDir .. opt.doafnName .. '/net-epoch-1.t7') --Xiaobai
+local doafn_loader = torch.load(opt.modelDir .. opt.doafnName .. '/net-epoch-200.t7') --Xiaobai
 local doafn = doafn_loader.net
 
 -- load model from current learning stage
@@ -167,20 +168,20 @@ else
 end
 local criterion_l1 = nn.AbsCriterion()
 criterion_l1.sizeAverage = true
-local criterion_pixel = nn.MSECriterion()
+local criterion_pixel = nn.MSECriterion()  -- mean square error
 criterion_pixel.sizeAverage = true
-local criterionGAN = nn.BCECriterion()
+local criterionGAN = nn.BCECriterion()  --binary cross entropy
 
 local optimStateD = { learningRate = opt.lr, beta1 = opt.beta1 }
 local optimStateG = { learningRate = opt.lr, beta1 = opt.beta1 }
-local plot_err_gap = 100
+local plot_err_gap = 1 --Xiaobai
 
 local feat_err, feat_err_per, pixel_err
 local real_label = 1
 local fake_label = 0
 local batch_doafn_out_masked = torch.Tensor(opt.batchSize, 3, opt.imgscale, opt.imgscale)
 local batch_doafn_feat = torch.Tensor(opt.batchSize, 512, 4, 4)
-local batch_cdoafn_mask = torch.Tensor(opt.batchSize, 3, opt.imgscale, opt.imgscale)
+local batch_cdoafn_mask = torch.Tensor(opt.batchSize, 1, opt.imgscale, opt.imgscale)
 local batch_im_fake = torch.Tensor(opt.batchSize, 3, opt.imgscale, opt.imgscale)
 local label = torch.Tensor(opt.batchSize)
 local batch_im_out_per = torch.Tensor(opt.batchSize, 3, opt.imgscale, opt.imgscale)
@@ -193,6 +194,9 @@ local data_tm = torch.Timer()
 local doafn_feat_idx = 18
 -- finding index of output(Tanh())
 local tanh_out_idx
+local tanh_out_masked_idx
+local addback_idx
+local output_idx
 for i,node in ipairs(netG.forwardnodes) do
 	name = node.data.annotations.name
 	if name == 'tanh_out' then
@@ -210,7 +214,7 @@ if opt.gpu >= 0 then
 	end
 	batch_doafn_out_masked = batch_doafn_out_masked:cuda()
 	batch_doafn_feat = batch_doafn_feat:cuda()
-  batch_cdoafn_mask = batch_cdoafn_mask:cuda()
+	batch_cdoafn_mask = batch_cdoafn_mask:cuda()
 	batch_im_fake = batch_im_fake:cuda()
 	batch_im_out_per = batch_im_out_per:cuda()
 	lossnet = lossnet:cuda()
@@ -237,20 +241,20 @@ local fDx = function(x)
 		 table.insert(df_do,out[l]:clone():fill(0))
 	 end
 	 local output_label = out[opt.loss_layer+1]
-   local errD_real = criterionGAN:forward(output_label, label)         --errD_real = -logD(Is)
+   local errD_real = criterionGAN:forward(output_label, label) --errD_real = -logD(Is)
    local df = criterionGAN:backward(output_label, label)
 	 df_do[opt.loss_layer+1] = df
    netD:backward(batch_im_out_per, df_do)
 
 	 -- generating fake images from generator
-   local fake = netG:forward({batch_doafn_out_masked, batch_doafn_feat, batch_view_in, mean_pixel, batch_cdoafn_mask}) -- adding batch_cdoafn_mask to the input of netG:forward
+   local fake = netG:forward({batch_doafn_out_masked, batch_doafn_feat, batch_view_in, mean_pixel, batch_cdoafn_mask})
    batch_im_fake:copy(fake)
 
 	 -- processing fake images
 	 label:fill(fake_label)
    local out = netD:forward(batch_im_fake)
    local output_label = out[opt.loss_layer+1]
-   local errD_fake = criterionGAN:forward(output_label, label)       --errD_fake = -log(1-D(G(Is)))
+   local errD_fake = criterionGAN:forward(output_label, label)   --errD_fake = -log(1-D(G(Is)))
    local df = criterionGAN:backward(output_label, label)
 	 df_do[opt.loss_layer+1] = df
    netD:backward(batch_im_fake, df_do)
@@ -268,7 +272,7 @@ local fGx = function(x)
    batch_im_fake:copy(fake)
 
 	 -- GAN LOSS and FEATURE MATCHING
-   -- get features for real images
+   -- get features for real images --Molly: feature from netD encoding
 	 local out = netD:forward(batch_im_out_per)
 	 local feat_real={}
 	 for l=1,opt.loss_layer do
@@ -286,14 +290,14 @@ local fGx = function(x)
 	 for l=1,opt.loss_layer do
 		 local err = criterion_pixel:forward(feat_fake[l], feat_real[l])
 		 local derr = criterion_pixel:backward(feat_fake[l], feat_real[l])
-		 feat_err = feat_err + err                             --feat_err = lambda1*L2(FD(G(Is)) - FD(It))
+		 feat_err = feat_err + err
 		 table.insert(df_do,derr:clone():mul(opt.lambda1))
 	 end
 
 	 -- fake labels are real for generator cost
    local output_label = out[opt.loss_layer+1]
 	 label:fill(real_label)
-	 local errG = criterionGAN:forward(output_label, label)    --errG = -logD(G(Is))
+	 local errG = criterionGAN:forward(output_label, label)
 	 local df = criterionGAN:backward(output_label, label)
 	 table.insert(df_do,df:clone())
 
@@ -315,18 +319,29 @@ local fGx = function(x)
 	 for l=1,opt.loss_layer do
 		 local err = criterion_pixel:forward(feat_fake_per[l], feat_gt_per[l])
 		 local derr = criterion_pixel:backward(feat_fake_per[l], feat_gt_per[l])
-		 feat_err_per = feat_err_per + err                      --feat_err_per = beta*L2(Fvgg(G(Is)) - Fvgg(It))
+		 feat_err_per = feat_err_per + err
 		 table.insert(d_feat_per,derr:clone())
 	 end
 	 local df_do2 = lossnet:updateGradInput(batch_im_fake,d_feat_per)
    df_do2:mul(opt.lambda2)
 
 	 if opt.tv_weight > 0 then
-		 local d_tvloss = tvloss:updateGradInput(batch_im_fake,0)      --d_tvloss = tv_weight*LTV(G(Is))  (for denoising purposes)
+		 local d_tvloss = tvloss:updateGradInput(batch_im_fake,0)
 		 --print(torch.abs(df_do2):mean(), torch.abs(df_do2):max(), torch.abs(df_do2):min())
 		 --print(torch.abs(d_tvloss):mean(),torch.abs(d_tvloss):max(), torch.abs(d_tvloss):min() )
-		 df_do2:add(d_tvloss:mul(tv_weight))
+		 df_do2:add(d_tvloss)
 	 end
+
+----------------------------------------------------------------------
+   -- Molly:
+   -- comput contour loss
+   local fake_contour = torch.sum(batch_im_fake,2)
+   fake_contour = torch.floor(fake_contour:mul(1/3))
+   fake_contour:add(-1):mul(-1)
+   err_contour = criterion_l1:forward(batch_cdoafn_mask, fake_contour)
+   local d_contour = criterion_l1:backward(batch_cdoafn_mask, fake_contour)
+   d_contour:mul(opt.contour_weight)
+-------------------------------------------------------------------
 
 	 -- compute error in pixel level
 	 --local d_pxloss
@@ -341,7 +356,7 @@ local fGx = function(x)
 	 --print(torch.abs(df_do1):mean(),torch.abs(df_do1):max(), torch.abs(df_do1):min() )
 	 --print(torch.abs(df_do2):mean(),torch.abs(df_do2):max(), torch.abs(df_do2):min() )
 
-	 netG:backward( {batch_doafn_out_masked, batch_doafn_feat, batch_view_in, mean_pixel, batch_cdoafn_mask}, df_do1:add(df_do2):add(d_pxloss) )
+	 netG:backward( {batch_doafn_out_masked, batch_doafn_feat, batch_view_in, mean_pixel, batch_cdoafn_mask}, df_do1:add(df_do2):add(d_pxloss):add(d_contour) )
 
    return errG, gradParametersG
 end
@@ -352,7 +367,7 @@ local get_batch = function()
 	-- make it [0, 1] -> [0, 255], and BGR, subtract mean
 	batch_im_out_per:mul(255)
 	batch_im_out_per = batch_im_out_per:index(2,perm)
-	batch_im_out_per:add(-1,mean_pixel)
+	batch_im_out_per:add(-1,mean_pixel) --minus the mean
 
 	-- make it [0, 1] -> [-1, 1]
 	batch_im_in:mul(2):add(-1)
@@ -373,7 +388,8 @@ local get_batch = function()
 
 	batch_doafn_feat:copy(doafn.forwardnodes[doafn_feat_idx].data.module.output)
 
-  batch_cdoafn_mask:copy(f[3]:repeatTensor(1,3,1,1))
+	batch_cdoafn_mask:copy(f[3])
+	-- print("!!!",batch_cdoafn_mask:size())
 end
 
 for t = epoch+1, opt.maxEpoch do
@@ -406,21 +422,21 @@ for t = epoch+1, opt.maxEpoch do
 		loss_listG = torch.cat(loss_listG, torch.Tensor(1,1):fill(errG[1]),1)
 
 		-- plot
-		if iter % 250 == 0 then
+		if iter % plot_err_gap == 0 then --Xiaobai
 			local nrow = 4
 			local to_plot={}
-			local pred = netG.forwardnodes[tanh_out_idx].data.module.output:clone()
-			pred = pred:index(2,perm)
+			local tanh_out = netG.forwardnodes[tanh_out_idx].data.module.output:clone()
+			tanh_out = tanh_out:index(2,perm)
+
 			for k=1,opt.batchSize do
-				to_plot[(k-1)*nrow + 1] = batch_doafn_out_masked[k]:clone()
+				to_plot[(k-1)*nrow + 1] = batch_doafn_out_masked[k]:clone() --masked doafn output
 				to_plot[(k-1)*nrow + 1]:add(1):mul(0.5)
-				to_plot[(k-1)*nrow + 2] = pred[k]
+				to_plot[(k-1)*nrow + 2] = tanh_out[k]  --tvsn generated image
 				to_plot[(k-1)*nrow + 2]:add(1):mul(0.5)
-				to_plot[(k-1)*nrow + 3] = batch_im_in[k]:clone()
+				to_plot[(k-1)*nrow + 3] = batch_im_in[k]:clone() --source
 				to_plot[(k-1)*nrow + 3]:add(1):mul(0.5)
-				to_plot[(k-1)*nrow + 4] = batch_im_out[k]:clone()
+				to_plot[(k-1)*nrow + 4] = batch_im_out[k]:clone() --target
 				to_plot[(k-1)*nrow + 4]:add(1):mul(0.5)
-        to_plot[(k-1)*nrow + 5] = batch_cdoafn_mask[k]:clone() --predict counter
 			end
 			formatted = image.toDisplayTensor({input=to_plot, nrow = nrow})
 			image.save((opt.modelPath .. '/training/' ..

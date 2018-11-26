@@ -90,10 +90,9 @@ function DCGAN.create_netG(opts)
 
 	local im = nn.MulConstant(127.5,false)(nn.AddConstant(1,false)(tanh_out))
 	local trans_im = nn.CSubTable()({im,mean})
-	local trans_im_masked = nn.CMulTable()({trans_im,output_mask})
 
 	local outputs = {}
-	table.insert(outputs,trans_im_masked)
+	table.insert(outputs,trans_im)
 
 	return nn.gModule(inputs, outputs)
 end
