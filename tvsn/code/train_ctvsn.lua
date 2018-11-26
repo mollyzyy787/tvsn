@@ -174,7 +174,7 @@ local criterionGAN = nn.BCECriterion()  --binary cross entropy
 
 local optimStateD = { learningRate = opt.lr, beta1 = opt.beta1 }
 local optimStateG = { learningRate = opt.lr, beta1 = opt.beta1 }
-local plot_err_gap = 1 --Xiaobai
+local plot_err_gap = 100 --Xiaobai
 
 local feat_err, feat_err_per, pixel_err
 local real_label = 1
@@ -447,7 +447,7 @@ for t = epoch+1, opt.maxEpoch do
 			local lossD = torch.Tensor(len)
 			local lossG = torch.Tensor(len)
 			for k=1,len do
-				lossD[k] = listD[(k-1)*plot_err_gap+1][1]
+				lossD[k] = listD[(k-1)*+1][1]
 				lossG[k] = listG[(k-1)*plot_err_gap+1][1]
 			end
 			gnuplot.pngfigure(opt.modelPath .. string.format('/gan_loss_epoch-%d.png',t))
