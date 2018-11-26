@@ -245,7 +245,7 @@ local fDx = function(x)
 
 	 -- generating fake images from generator
    local fake = netG:forward({batch_doafn_out_masked, batch_doafn_feat, batch_view_in, mean_pixel, batch_cdoafn_mask})
-   batch_im_fake:copy(fake[1])
+   batch_im_fake:copy(fake)
 
 	 -- processing fake images
 	 label:fill(fake_label)
@@ -423,18 +423,18 @@ for t = epoch+1, opt.maxEpoch do
 			local nrow = 6
 			local to_plot={}
 			local pred = netG.forwardnodes[tanh_out_idx].data.module.output:clone()
-			pred = pred:index(3,perm)
+			pred = pred:index(2,perm)
 			for k=1,opt.batchSize do
 				to_plot[(k-1)*nrow + 1] = batch_doafn_out_masked[k]:clone() --masked doafn output
 				to_plot[(k-1)*nrow + 1]:add(1):mul(0.5)
-				to_plot[(k-1)*nrow + 2] = pred[1][k] --tvsn output
+				to_plot[(k-1)*nrow + 2] = pred[k] --tvsn output
 				to_plot[(k-1)*nrow + 2]:add(1):mul(0.5)
 				to_plot[(k-1)*nrow + 3] = batch_im_in[k]:clone() --source
 				to_plot[(k-1)*nrow + 3]:add(1):mul(0.5)
 				to_plot[(k-1)*nrow + 4] = batch_im_out[k]:clone() --target
 				to_plot[(k-1)*nrow + 4]:add(1):mul(0.5)
 				to_plot[(k-1)*nrow + 5] = batch_cdoafn_mask[k]:repeatTensor(3,1,1):clone() --predict counter
-				to_plot[(k-1)*nrow + 6] = pred[2][k] --predict counter
+				to_plot[(k-1)*nrow + 6] = batch_cdoafn_mask[k]:mul(-1):add(1):repeatTensor(3,1,1):clone() --predict counter
 			end
 			formatted = image.toDisplayTensor({input=to_plot, nrow = nrow})
 			image.save((opt.modelPath .. '/training/' ..
