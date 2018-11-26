@@ -427,14 +427,15 @@ for t = epoch+1, opt.maxEpoch do
 			local nrow = 7
 			local to_plot={}
 			local pred = netG.forwardnodes[tanh_out_idx].data.module.output:clone()
-			local pred_masked = netG.forwardnodes[output_idx].data.module.output:clone()
 			pred = pred:index(2,perm)
+			local pred_masked = netG.forwardnodes[output_idx].data.module.output:clone()
+			pred_masked = pred_masked:index(2,perm)
 			for k=1,opt.batchSize do
 				to_plot[(k-1)*nrow + 1] = batch_doafn_out_masked[k]:clone() --masked doafn output
 				to_plot[(k-1)*nrow + 1]:add(1):mul(0.5)
 				to_plot[(k-1)*nrow + 2] = pred[k] --tvsn output
 				to_plot[(k-1)*nrow + 2]:add(1):mul(0.5)
-				to_plot[(k-1)*nrow + 3] = pred_masked[k] --tvsn output
+				to_plot[(k-1)*nrow + 3] = pred_masked[k] --tvsn output masked
 				to_plot[(k-1)*nrow + 3]:add(1):mul(0.5)
 				to_plot[(k-1)*nrow + 4] = batch_im_in[k]:clone() --source
 				to_plot[(k-1)*nrow + 4]:add(1):mul(0.5)
