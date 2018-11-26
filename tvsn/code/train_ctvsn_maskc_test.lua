@@ -245,7 +245,7 @@ local fDx = function(x)
 
 	 -- generating fake images from generator
    local fake = netG:forward({batch_doafn_out_masked, batch_doafn_feat, batch_view_in, mean_pixel, batch_cdoafn_mask})
-   batch_im_fake:copy(fake)
+   batch_im_fake:copy(fake[1])
 
 	 -- processing fake images
 	 label:fill(fake_label)
