@@ -20,7 +20,7 @@ opt = lapp[[
   --background				(default 0)
   --nThreads					(default 8)
   --maxEpoch          (default 200)
-  --iter_per_epoch		(default 1)
+  --iter_per_epoch		(default 1000)
   --batchSize         (default 15)
   --lossnet						(default 'vgg16')
   --lr								(default 0.0001)
