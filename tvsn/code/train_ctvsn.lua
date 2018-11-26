@@ -194,9 +194,6 @@ local data_tm = torch.Timer()
 local doafn_feat_idx = 18
 -- finding index of output(Tanh())
 local tanh_out_idx
-local tanh_out_masked_idx
-local addback_idx
-local output_idx
 for i,node in ipairs(netG.forwardnodes) do
 	name = node.data.annotations.name
 	if name == 'tanh_out' then
@@ -219,7 +216,7 @@ if opt.gpu >= 0 then
 	batch_im_out_per = batch_im_out_per:cuda()
 	lossnet = lossnet:cuda()
 	label = label:cuda()
-  	netG = netG:cuda()
+  netG = netG:cuda()
 	netD = netD:cuda()
 	doafn = doafn:cuda()
 	criterionGAN = criterionGAN:cuda()
