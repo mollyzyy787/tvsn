@@ -181,7 +181,7 @@ local real_label = 1
 local fake_label = 0
 local batch_doafn_out_masked = torch.Tensor(opt.batchSize, 3, opt.imgscale, opt.imgscale)
 local batch_doafn_feat = torch.Tensor(opt.batchSize, 512, 4, 4)
-local batch_cdoafn_mask = torch.Tensor(opt.batchSize, 1, opt.imgscale, opt.imgscale)
+--local batch_cdoafn_mask = torch.Tensor(opt.batchSize, 1, opt.imgscale, opt.imgscale)
 local batch_im_fake = torch.Tensor(opt.batchSize, 3, opt.imgscale, opt.imgscale)
 local label = torch.Tensor(opt.batchSize)
 local batch_im_out_per = torch.Tensor(opt.batchSize, 3, opt.imgscale, opt.imgscale)
@@ -211,7 +211,7 @@ if opt.gpu >= 0 then
 	end
 	batch_doafn_out_masked = batch_doafn_out_masked:cuda()
 	batch_doafn_feat = batch_doafn_feat:cuda()
-	batch_cdoafn_mask = batch_cdoafn_mask:cuda()
+	--batch_cdoafn_mask = batch_cdoafn_mask:cuda()
 	batch_im_fake = batch_im_fake:cuda()
 	batch_im_out_per = batch_im_out_per:cuda()
 	lossnet = lossnet:cuda()
@@ -244,7 +244,7 @@ local fDx = function(x)
    netD:backward(batch_im_out_per, df_do)
 
 	 -- generating fake images from generator
-   local fake = netG:forward({batch_doafn_out_masked, batch_doafn_feat, batch_view_in, mean_pixel, batch_cdoafn_mask})
+   local fake = netG:forward({batch_doafn_out_masked, batch_doafn_feat, batch_view_in, mean_pixel})
    batch_im_fake:copy(fake)
 
 	 -- processing fake images
@@ -265,7 +265,7 @@ local fGx = function(x)
    gradParametersD:zero()
    gradParametersG:zero()
 
-   local fake = netG:forward({batch_doafn_out_masked, batch_doafn_feat, batch_view_in, mean_pixel, batch_cdoafn_mask})
+   local fake = netG:forward({batch_doafn_out_masked, batch_doafn_feat, batch_view_in, mean_pixel})
    batch_im_fake:copy(fake)
 
 	 -- GAN LOSS and FEATURE MATCHING
@@ -332,12 +332,12 @@ local fGx = function(x)
 ----------------------------------------------------------------------
    -- Molly:
    -- comput contour loss
-   local fake_contour = torch.sum(batch_im_fake,2)
-   fake_contour = torch.floor(fake_contour:mul(1/3))
-   fake_contour:add(-1):mul(-1)
-   err_contour = criterion_l1:forward(batch_cdoafn_mask, fake_contour)
-   local d_contour = criterion_l1:backward(batch_cdoafn_mask, fake_contour)
-   d_contour:mul(opt.contour_weight)
+   --local fake_contour = torch.sum(batch_im_fake,2)
+   --fake_contour = torch.floor(fake_contour:mul(1/3))
+   --fake_contour:add(-1):mul(-1)
+   --err_contour = criterion_l1:forward(batch_cdoafn_mask, fake_contour)
+   --local d_contour = criterion_l1:backward(batch_cdoafn_mask, fake_contour)
+   --d_contour:mul(opt.contour_weight)
 -------------------------------------------------------------------
 
 	 -- compute error in pixel level
@@ -353,7 +353,7 @@ local fGx = function(x)
 	 --print(torch.abs(df_do1):mean(),torch.abs(df_do1):max(), torch.abs(df_do1):min() )
 	 --print(torch.abs(df_do2):mean(),torch.abs(df_do2):max(), torch.abs(df_do2):min() )
 
-	 netG:backward( {batch_doafn_out_masked, batch_doafn_feat, batch_view_in, mean_pixel, batch_cdoafn_mask}, df_do1:add(df_do2):add(d_pxloss):add(d_contour) )
+	 netG:backward( {batch_doafn_out_masked, batch_doafn_feat, batch_view_in, mean_pixel}, df_do1:add(df_do2):add(d_pxloss))
 
    return errG, gradParametersG
 end
@@ -385,7 +385,7 @@ local get_batch = function()
 
 	batch_doafn_feat:copy(doafn.forwardnodes[doafn_feat_idx].data.module.output)
 
-	batch_cdoafn_mask:copy(f[3])
+	--batch_cdoafn_mask:copy(f[3])
 	-- print("!!!",batch_cdoafn_mask:size())
 end
 

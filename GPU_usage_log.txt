@@ -1,0 +1,1 @@
+GPU 1: baseline model (model = CTVSN), output is not masked
