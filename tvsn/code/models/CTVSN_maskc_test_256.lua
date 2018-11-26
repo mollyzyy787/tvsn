@@ -94,8 +94,8 @@ function DCGAN.create_netG(opts)
 	local addtional_background_revsed = nn.Replicate(3,2)(output_mask) --[0,1]
 	local addtional_background_shifted = nn.AddConstant(1)(nn.MulConstant(-1)(addtional_background_revsed)):annotate{name='addback'} --[0,1]
 
-	local output_shifted = nn.CAddTable(){tanh_out_masked_shifted,addtional_background_shifted}:annotate{name='output'} --[0,1]
-	local output = nn.AddConstant(-1)(nn.MulConstant(2)(output_shifted))
+	local output_shifted = nn.CAddTable(){tanh_out_masked_shifted,addtional_background_shifted} --[0,1]
+	local output = nn.AddConstant(-1)(nn.MulConstant(2)(output_shifted)):annotate{name='output'} --[-1,1]
 	-- 3 x 256 x 256
 
 	local im = nn.MulConstant(127.5,false)(nn.AddConstant(1,false)(output)) --[-1,1]->[0,255]
