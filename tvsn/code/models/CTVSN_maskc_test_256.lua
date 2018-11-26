@@ -95,7 +95,7 @@ function DCGAN.create_netG(opts)
 	local trans_im_masked_shifted = nn.CMulTable()({trans_im,nn.Replicate(3,2)(output_mask)})
 	local trans_im_masked = nn.AddConstant(-1)(nn.MulConstant(2)(trans_im_masked_shifted))
 	local addtional_background_single = nn.AddConstant(1)(nn.MulConstant(-1)(output_mask))
-	local addtional_background = nn.Replicate(3,2)(nn.AddConstant(-1)(nn.MulConstant(2)(addtional_background_single))
+	local addtional_background = nn.Replicate(3,2)(nn.AddConstant(-1)(nn.MulConstant(2)(addtional_background_single)))
 	local output = nn.CAddTable(){trans_im_masked,addtional_background}
 
 	local outputs = {}
