@@ -92,7 +92,7 @@ function DCGAN.create_netG(opts)
 	local im = nn.MulConstant(127.5,false)(nn.AddConstant(1,false)(tanh_out))
 	local trans_im = nn.CSubTable()({im,mean})
 
-	local trans_im_shifted = nn.MulConstant(0.5)(nn.AddConstant(1)(trans_im))
+	local trans_im_shifted = nn.MulConstant(0.5,false)(nn.AddConstant(1,false)(trans_im))
 	-- local trans_im_masked_shifted = nn.CMulTable()({trans_im_shifted,nn.Replicate(3,2)(output_mask)})
 	-- local trans_im_masked = nn.AddConstant(-1)(nn.MulConstant(2)(trans_im_masked_shifted))
 
