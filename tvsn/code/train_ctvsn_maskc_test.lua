@@ -69,7 +69,7 @@ end
 
 -- if opt.gpu < 0 or opt.gpu > 3 then opt.gpu = -1 end
 if opt.gpu >= 0 then
-  cutorch.setDevice(opt.gpu)
+  cutorch.setDevice(opt.gpu+1)
   print('<gpu> using device ' .. opt.gpu)
 end
 
