@@ -1,1 +1,7 @@
+GPU 0: maskc(onvolution)o(utput) (model = CTVSN_maskco)
 GPU 1: baseline model (model = CTVSN), output is not masked
+GPU 2: maskp(arallel)o(utput) (model = CTVSN_maskpo)
+GPU 3: maskc(onvolution) (model = CTVSN_maskc)
+GPU 4: maskp(arallel) (model = CTVSN_maskp)
+GPU 5: masko(utput) (model = CTVSN_masko)
+
