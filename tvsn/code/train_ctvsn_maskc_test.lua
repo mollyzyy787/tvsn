@@ -448,9 +448,11 @@ for t = epoch+1, opt.maxEpoch do
 				to_plot[(k-1)*nrow + 2] = tanh_out[k]
 				to_plot[(k-1)*nrow + 2]:add(1):mul(0.5)
 				to_plot[(k-1)*nrow + 3] = tanh_out_masked[k]
+				print('3 max:',to_plot[(k-1)*nrow + 3]:max(),' 3 min:',to_plot[(k-1)*nrow + 3]:min())
 				to_plot[(k-1)*nrow + 3]:add(1):mul(0.5)
 				print('3 max:',to_plot[(k-1)*nrow + 3]:max(),' 3 min:',to_plot[(k-1)*nrow + 3]:min())
 				to_plot[(k-1)*nrow + 4] = addback[k]
+				print('4 max:',to_plot[(k-1)*nrow + 4]:max(),' 4 min:',to_plot[(k-1)*nrow + 4]:min())
 				to_plot[(k-1)*nrow + 4]:add(1):mul(0.5)
 				print('4 max:',to_plot[(k-1)*nrow + 4]:max(),' 4 min:',to_plot[(k-1)*nrow + 4]:min())
 				to_plot[(k-1)*nrow + 5] = output[k]
