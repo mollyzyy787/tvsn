@@ -432,7 +432,7 @@ for t = epoch+1, opt.maxEpoch do
 		loss_listG = torch.cat(loss_listG, torch.Tensor(1,1):fill(errG[1]),1)
 
 		-- plot
-		if iter % 250 == 0 then --Xiaobai
+		if iter % 1 == 0 then --Xiaobai
 			local nrow = 8
 			local to_plot={}
 			local tanh_out = netG.forwardnodes[tanh_out_idx].data.module.output:clone()
