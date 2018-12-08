@@ -88,7 +88,7 @@ function DCGAN.create_netG(opts)
 	local de_skip6 = cudnn.ReLU()(cudnn.SpatialBatchNormalization(16)(de_skip6))
 	local tanh_out = nn.Tanh()(cudnn.SpatialConvolution(16,3,3,3,1,1,1,1)(de_skip6)):annotate{name='tanh_out'}
 
-	local tanh_out_add = nn.CAdd()(input_im,tanh_out)
+	local tanh_out_add = nn.CAdd(){input_im,tanh_out}
 	local tanh_out_shifted = nn.MulConstant(0.5,false)(nn.AddConstant(1,false)(tanh_out_add)) --[-1,1]->[0,1]
 	local tanh_out_masked_shifted = nn.CMulTable()({tanh_out_shifted,nn.Replicate(3,2)(output_mask)}):annotate{name='tanh_out_masked'} --[0,1]
 

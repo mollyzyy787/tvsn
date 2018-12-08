@@ -175,7 +175,7 @@ local criterionGAN = nn.BCECriterion()  --binary cross entropy
 
 local optimStateD = { learningRate = opt.lr, beta1 = opt.beta1 }
 local optimStateG = { learningRate = opt.lr, beta1 = opt.beta1 }
-local plot_err_gap = 100 --Xiaobai
+local plot_err_gap = 1 --Xiaobai
 
 local feat_err, feat_err_per, pixel_err
 local real_label = 1
