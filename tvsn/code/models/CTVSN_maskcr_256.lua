@@ -126,13 +126,13 @@ function DCGAN.create_netD(opts)
   -- en_conv1 = 64 x 128 x 128
   -- en_conv2 = 64 x 64 x 64
 	local en_conv2 = nn.LeakyReLU(0.2, true)(cudnn.SpatialBatchNormalization(64)(cudnn.SpatialConvolution(64,64,4,4,2,2,1,1)(en_conv1))):annotate{name='feat2'}
-	-- en_conv3 = 128 x 32 x 32
-	local en_conv3 = nn.LeakyReLU(0.2, true)(cudnn.SpatialBatchNormalization(128)((cudnn.SpatialConvolution(64,128,4,4,2,2,1,1)(en_conv2)))):annotate{name='feat3'}
-  -- en_conv4 = 256 x 16 x 16
-	local en_conv4 = nn.LeakyReLU(0.2, true)(cudnn.SpatialBatchNormalization(256)((cudnn.SpatialConvolution(128,256,4,4,2,2,1,1)(en_conv3)))):annotate{name='feat4'}
-  -- en_conv5 = 512 x 4 x 4
-	local en_conv5 = nn.LeakyReLU(0.2, true)(cudnn.SpatialBatchNormalization(512)((cudnn.SpatialConvolution(256,512,4,4,4,4,0,0)(en_conv4)))):annotate{name='feat5'}
-	local out = nn.View(1)(nn.Sigmoid()(cudnn.SpatialConvolution(512,1,4,4)((en_conv5))))
+	-- en_conv3 = 512 x 4 x 4
+	local en_conv3 = nn.LeakyReLU(0.2, true)(cudnn.SpatialBatchNormalization(128)((cudnn.SpatialConvolution(64,512,40,40,8,8,0,0)(en_conv2)))):annotate{name='feat3'}
+  -- (deleted) en_conv4 = 256 x 16 x 16
+	--local en_conv4 = nn.LeakyReLU(0.2, true)(cudnn.SpatialBatchNormalization(256)((cudnn.SpatialConvolution(128,256,4,4,2,2,1,1)(en_conv3)))):annotate{name='feat4'}
+  -- (deleted) en_conv5 = 512 x 4 x 4
+	-- local en_conv5 = nn.LeakyReLU(0.2, true)(cudnn.SpatialBatchNormalization(512)((cudnn.SpatialConvolution(256,512,4,4,4,4,0,0)(en_conv4)))):annotate{name='feat5'}
+	local out = nn.View(1)(nn.Sigmoid()(cudnn.SpatialConvolution(512,1,4,4)((en_conv3))))
 
 	local inputs = {}
 	local outputs = {}
