@@ -86,11 +86,13 @@ function DCGAN.create_netG(opts)
 	local de_skip6 = nn.JoinTable(2)({de_deconv6,input_im})
 	local de_skip6 = cudnn.SpatialConvolution(16+3,16,3,3,1,1,1,1)(de_skip6)
 	local de_skip6 = cudnn.ReLU()(cudnn.SpatialBatchNormalization(16)(de_skip6))
-	local tanh_out = nn.Tanh()(cudnn.SpatialConvolution(16,3,3,3,1,1,1,1)(de_skip6)):annotate{name='tanh_out'}
-	local tanh_out_add = nn.CAddTable(){input_im,tanh_out}:annotate{name='tanh_out_add'}
+	-- local tanh_out = nn.Tanh()(cudnn.SpatialConvolution(16,3,3,3,1,1,1,1)(de_skip6)):annotate{name='tanh_out'}
+	-- local tanh_out_add = nn.CAddTable(){input_im,tanh_out}:annotate{name='tanh_out_add'}
+	local residual = cudnn.SpatialConvolution(16,3,3,3,1,1,1,1)(de_skip6):annotate{name='residual'}
+	local output = nn.CAddTable(){input_im,residual}:annotate{name='output'}
 	-- 3 x 256 x 256
 
-	local im = nn.MulConstant(127.5,false)(nn.AddConstant(1,false)(tanh_out_add))
+	local im = nn.MulConstant(127.5,false)(nn.AddConstant(1,false)(output))
 	local trans_im = nn.CSubTable()({im,mean})
 
 	local outputs = {}

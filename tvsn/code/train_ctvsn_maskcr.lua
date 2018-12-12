@@ -175,7 +175,7 @@ local criterionGAN = nn.BCECriterion()  --binary cross entropy
 
 local optimStateD = { learningRate = opt.lr, beta1 = opt.beta1 }
 local optimStateG = { learningRate = opt.lr, beta1 = opt.beta1 }
-local plot_err_gap = 100 --Xiaobai
+local plot_err_gap = 1 --Xiaobai
 
 local feat_err, feat_err_per, pixel_err
 local real_label = 1
@@ -194,19 +194,19 @@ local tm = torch.Timer()
 local data_tm = torch.Timer()
 local doafn_feat_idx = 18
 -- finding index of output(Tanh())
-local tanh_out_idx
-local tanh_out_add_idx
+local residual_idx
+local output_idx
 for i,node in ipairs(netG.forwardnodes) do
 	name = node.data.annotations.name
-	if name == 'tanh_out' then
-		tanh_out_idx = i
+	if name == 'residual' then
+		residual_idx = i
 	end
-	if name == "tanh_out_add" then
-		tanh_out_add_idx = i
+	if name == "output" then
+		output_idx = i
 	end
 end
-print(tanh_out_idx)
-print(tanh_out_add_idx)
+print(residual_idx)
+print(output_idx)
 
 if opt.gpu >= 0 then
   print('<gpu> using device ' .. opt.gpu)
@@ -425,19 +425,19 @@ for t = epoch+1, opt.maxEpoch do
 		loss_listG = torch.cat(loss_listG, torch.Tensor(1,1):fill(errG[1]),1)
 
 		-- plot
-		if iter % 250 == 0 then --Xiaobai
+		if iter % 1 == 0 then --Xiaobai
 			local nrow = 6
 			local to_plot={}
-			local tanh_out = netG.forwardnodes[tanh_out_idx].data.module.output:clone()
-			tanh_out = tanh_out:index(2,perm)
-			local tanh_out_add = netG.forwardnodes[tanh_out_add_idx].data.module.output:clone()
-			tanh_out_add = tanh_out_add:index(2,perm)
+			local output_image = netG.forwardnodes[output_idx].data.module.output:clone()
+			output_image = output_image:index(2,perm)
+			local residual = netG.forwardnodes[residual_idx].data.module.output:clone()
+			residual = residual:index(2,perm)
 			for k=1,opt.batchSize do
 				to_plot[(k-1)*nrow + 1] = batch_doafn_out_masked[k]:clone() --masked doafn output
 				to_plot[(k-1)*nrow + 1]:add(1):mul(0.5)
-				to_plot[(k-1)*nrow + 2] = tanh_out[k]
+				to_plot[(k-1)*nrow + 2] = residual[k]
 				to_plot[(k-1)*nrow + 2]:add(1):mul(0.5)
-				to_plot[(k-1)*nrow + 3] = tanh_out_add[k]
+				to_plot[(k-1)*nrow + 3] = output_image[k]
 				to_plot[(k-1)*nrow + 3]:add(1):mul(0.5)
 				to_plot[(k-1)*nrow + 4] = batch_im_in[k]:clone() --source
 				to_plot[(k-1)*nrow + 4]:add(1):mul(0.5)
