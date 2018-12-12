@@ -175,7 +175,7 @@ local criterionGAN = nn.BCECriterion()  --binary cross entropy
 
 local optimStateD = { learningRate = opt.lr, beta1 = opt.beta1 }
 local optimStateG = { learningRate = opt.lr, beta1 = opt.beta1 }
-local plot_err_gap = 1 --Xiaobai
+local plot_err_gap = 100 --Xiaobai
 
 local feat_err, feat_err_per, pixel_err
 local real_label = 1
@@ -425,7 +425,7 @@ for t = epoch+1, opt.maxEpoch do
 		loss_listG = torch.cat(loss_listG, torch.Tensor(1,1):fill(errG[1]),1)
 
 		-- plot
-		if iter % 1 == 0 then --Xiaobai
+		if iter % 250 == 0 then --Xiaobai
 			local nrow = 6
 			local to_plot={}
 			local output_image = netG.forwardnodes[output_idx].data.module.output:clone()
