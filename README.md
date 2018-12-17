@@ -92,6 +92,10 @@ Rendering images and computing visibility maps are time consuming jobs, so I hig
 ```bash
 $(tvsn_root)/tvsn/code$>./script_train_doafn.sh
 ```
+The modified model CDOAFN can be trained by running:
+```bash
+$(tvsn_root)/tvsn/code$>./script_train_cdoafn.sh
+```
 
 ## 4. Training TVSN(Transformation-grounded view synthesis network)
 First, we need to prepare pretrained vgg16 network. We imported [caffemodel](https://gist.github.com/ksimonyan/211839e770f7b538e2d8#file-readme-md) and translated into torch nngraph format. You can download translated version with provided script.
@@ -102,6 +106,12 @@ Now, you can train!
 ```bash
 $(tvsn_root)/tvsn/code$>./script_train_tvsn.sh
 ```
+Triain different modification to the TVSN model can be done by running the corresponding train .sh script. 
+For example, to train model maskcr, run:
+```bash
+$(tvsn_root)/tvsn/code$>./script_train_ctvsn_maskcr.sh
+```
+
 
 ## 5. Downloading pretrained models
 We provide pretrained models for car and chair category. You can download it from following links.
