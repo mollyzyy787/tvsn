@@ -106,7 +106,7 @@ Now, you can train!
 ```bash
 $(tvsn_root)/tvsn/code$>./script_train_tvsn.sh
 ```
-Triain different modification to the TVSN model can be done by running the corresponding train .sh script. 
+Training different modification to the TVSN model can be done by running the corresponding train .sh script. 
 For example, to train model maskcr, run:
 ```bash
 $(tvsn_root)/tvsn/code$>./script_train_ctvsn_maskcr.sh
